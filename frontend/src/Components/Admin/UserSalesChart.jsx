@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import {
     BarChart,
     Bar,
@@ -10,40 +10,35 @@ import {
     ResponsiveContainer,
     Cell,
 } from "recharts";
-import { getToken } from "../Utils/helpers";
-import axios from "axios";
+import adminApi from './adminApi'
 import Loader from '../Layout/Loader';
 
 const UserSalesChart = () => {
     const [sales, setSales] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
-    const userSales = async () => {
-
-        try {
-            const config = {
-                headers: {
-
-                    'Authorization': `Bearer ${getToken()}`
-                }
-            }
-
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/customer-sales`, config)
-            setSales(data.customerSales)
-            setLoading(false)
-        } catch (error) {
-            setError(error.response.data.message)
-        }
-    }
-    const barColors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
+    const barColors = ["#FACC15", "#EAB308", "#1E293B"]
     useEffect(() => {
-        userSales()
-        // allUsers()
+        let active = true
+        adminApi.get('/admin/customer-sales')
+            .then(({ data }) => {
+                if (active) setSales(data.customerSales)
+            })
+            .catch(error => {
+                if (active) setError(error.response?.data?.message || error.message || 'Unable to load customer sales.')
+            })
+            .finally(() => {
+                if (active) setLoading(false)
+            })
+
+        return () => {
+            active = false
+        }
     }, [])
 
     return (
         <ResponsiveContainer width="90%" height={600}>
-            {loading ? <Loader /> : (<BarChart
+            {loading ? <Loader /> : error ? <div className="alert alert-danger">{error}</div> : (<BarChart
                 data={sales}
             >
                 <CartesianGrid strokeDasharray="2 2" />

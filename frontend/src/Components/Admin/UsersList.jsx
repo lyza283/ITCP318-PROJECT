@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import 'react-toastify/dist/ReactToastify.css';
@@ -7,60 +7,44 @@ import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
 import Sidebar from './SideBar'
 
-import axios from 'axios';
-import { getToken, errMsg, successMsg } from '../Utils/helpers';
+import { errMsg, successMsg } from '../Utils/helpers';
+import adminApi from './adminApi'
 import { DataGrid, } from '@mui/x-data-grid'
 
 const UsersList = () => {
     const [loading, setLoading] = useState(true)
-    const [error, setError] = useState('')
     const [allUsers, setAllUsers] = useState([])
-    const [isDeleted, setIsDeleted] = useState('')
-    let navigate = useNavigate();
-    const config = {
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${getToken()}`
-        }
-    }
-    const listUsers = async () => {
-        try {
-
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/users`, config)
-            setAllUsers(data.users)
-            setLoading(false)
-
-        } catch (error) {
-            setError(error.response.data.message)
-
-        }
-    }
+    const navigate = useNavigate();
     const deleteUser = async (id) => {
         try {
-            const { data } = await axios.delete(`${import.meta.env.VITE_API}/admin/user/${id}`, config)
-            setIsDeleted(data.success)
-            setLoading(false)
+            const { data } = await adminApi.delete(`/admin/user/${id}`)
+            if (data.success) {
+                successMsg('User deleted successfully')
+                navigate('/admin/users')
+            }
 
         } catch (error) {
-            setError(error.response.data.message)
-
+            errMsg(error.response?.data?.message || error.message || 'Unable to delete user.')
         }
     }
 
     useEffect(() => {
-        listUsers();
-        if (error) {
-            errMsg(error);
-            setError('')
+        let active = true
+        adminApi.get('/admin/users')
+            .then(({ data }) => {
+                if (active) setAllUsers(data.users)
+            })
+            .catch(error => {
+                if (active) errMsg(error.response?.data?.message || error.message || 'Unable to load users.')
+            })
+            .finally(() => {
+                if (active) setLoading(false)
+            })
+
+        return () => {
+            active = false
         }
-        if (isDeleted) {
-            successMsg('User deleted successfully');
-            navigate('/admin/users');
-
-        }
-
-    }, [error, isDeleted,])
-
+    }, [])
 
     const deleteUserHandler = (id) => {
         deleteUser(id)
@@ -156,4 +140,3 @@ const UsersList = () => {
 }
 
 export default UsersList
-

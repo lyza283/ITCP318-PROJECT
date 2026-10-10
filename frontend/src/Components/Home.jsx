@@ -66,7 +66,7 @@ const Home = () => {
 
     return (
         <>
-            <MetaData title={'shop Here'} />
+            <MetaData title={'Explore Supplies'} />
             {loading ? <Loader /> : (<div className="container container-fluid">
                 <h1 id="products_heading">Latest Products</h1>
                 <section id="products" className="container mt-5">

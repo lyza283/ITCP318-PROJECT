@@ -1,49 +1,37 @@
-import React, { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 
 import MetaData from '../Layout/MetaData'
-import Loader from '../Layout/Loader'
 import Sidebar from './SideBar'
 // import Toast from '../Layout/Toast'
 import Swal from 'sweetalert2'
-import { getUser, getToken, errMsg } from '../Utils/helpers'
-import axios from 'axios'
+import { errMsg, successMsg } from '../Utils/helpers'
+import adminApi from './adminApi'
 import { DataGrid, } from '@mui/x-data-grid'
 
 
 
 const ProductReviews = () => {
     const [productId, setProductId] = useState('')
-    const [error, setError] = useState('')
     const [listReviews, setListReviews] = useState([])
-    const [deleteError, setDeleteError] = useState('')
-    const [isDeleted, setIsDeleted] = useState(false)
-    const [user, setUser] = useState(getUser())
-
-    const config = {
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${getToken()}`
-        }
-    }
 
     const getProductReviews = async (id) => {
         try {
-
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/reviews?id=${id}`, config)
+            const { data } = await adminApi.get('/reviews', { params: { id } })
             setListReviews(data.reviews)
-
         } catch (error) {
-            setError(error.response.data.message)
+            errMsg(error.response?.data?.message || error.message || 'Unable to load reviews.')
         }
     }
     const deleteReview = async (id, productId) => {
         try {
-            const { data } = await axios.delete(`${import.meta.env.VITE_API}/reviews?id=${id}&productId=${productId}`, config)
-            setIsDeleted(data.success)
-
+            const { data } = await adminApi.delete('/reviews', { params: { id, productId } })
+            if (data.success) {
+                successMsg('Review deleted successfully')
+                await getProductReviews(productId)
+            }
         } catch (error) {
-            setDeleteError(error.response.data.message);
+            errMsg(error.response?.data?.message || error.message || 'Unable to delete review.')
         }
     }
 
@@ -61,27 +49,6 @@ const ProductReviews = () => {
         })
 
     }
-    useEffect(() => {
-        if (error) {
-
-            setError('')
-        }
-
-        if (deleteError) {
-
-            setDeleteError('')
-        }
-
-        if (productId !== '') {
-            getProductReviews(productId)
-        }
-
-        if (isDeleted) {
-            errMsg('Review deleted successfully', 'success');
-            setIsDeleted(false)
-        }
-    }, [error, productId, isDeleted, deleteError])
-
     const submitHandler = (e) => {
         e.preventDefault();
         getProductReviews(productId)

@@ -2,61 +2,72 @@ const Product = require('../models/product')
 const Order = require('../models/order')
 const cloudinary = require('cloudinary')
 const APIFeatures = require('../utils/apiFeatures');
+const fs = require('fs/promises');
 
 exports.newProduct = async (req, res, next) => {
-    console.log(req.files)
-    let images = []
-    // if (typeof req.files === 'string') {
-    //     images.push(req.files)
-    // } else {
-    //     images = req.files
-    // }
-
-    if (typeof req.body.images === 'string') {
-        images.push(req.body.images)
-    } else {
-        images = req.body.images
+    if (!req.files?.length) {
+        return res.status(400).json({
+            success: false,
+            message: 'Please select at least one product image.'
+        });
     }
 
-    let imagesLinks = [];
-
-    for (let i = 0; i < images.length; i++) {
-        try {
-            // const result = await cloudinary.v2.uploader.upload(images[i].path, {
-            const result = await cloudinary.v2.uploader.upload(images[i], {
-
+    const imagesLinks = [];
+    try {
+        for (const image of req.files) {
+            const result = await cloudinary.v2.uploader.upload(image.path, {
                 folder: 'products',
                 width: 150,
-                crop: "scale",
+                crop: 'scale',
             });
 
             imagesLinks.push({
                 public_id: result.public_id,
                 url: result.secure_url
-            })
-
-        } catch (error) {
-            console.log(error)
+            });
         }
-
+    } catch (error) {
+        console.error('Product image upload failed:', error.message);
+        return res.status(502).json({
+            success: false,
+            message: 'Product image upload failed. Check Cloudinary configuration and try again.'
+        });
+    } finally {
+        await Promise.all(req.files.map(async image => {
+            try {
+                await fs.unlink(image.path);
+            } catch (error) {
+                if (error.code !== 'ENOENT') {
+                    console.error('Failed to remove temporary product image:', error.message);
+                }
+            }
+        }));
     }
 
-    req.body.images = imagesLinks
-    // req.body.user = req.user.id;
+    try {
+        const product = await Product.create({
+            ...req.body,
+            images: imagesLinks,
+            user: req.user._id
+        });
 
-    const product = await Product.create(req.body);
-
-    if (!product)
-        return res.status(400).json({
+        return res.status(201).json({
+            success: true,
+            product
+        });
+    } catch (error) {
+        if (error.name === 'ValidationError' || error.name === 'CastError') {
+            return res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
+        console.error('Product creation failed:', error.message);
+        return res.status(500).json({
             success: false,
-            message: 'Product not created'
-        })
-
-
-    return res.status(201).json({
-        success: true,
-        product
-    })
+            message: 'Product could not be created. Please try again.'
+        });
+    }
 }
 
 exports.getSingleProduct = async (req, res, next) => {
@@ -110,52 +121,70 @@ exports.getProducts = async (req, res) => {
 }
 
 exports.updateProduct = async (req, res, next) => {
-    let product = await Product.findById(req.params.id);
-    console.log(req.body)
+    const product = await Product.findById(req.params.id);
     if (!product) {
         return res.status(404).json({
             success: false,
             message: 'Product not found'
         })
     }
-    let images = []
 
-    // if (typeof req.files === 'string') {
-    //     images.push(req.files)
-    // } else {
-    //     images = req.files
-    // }
-    if (typeof req.body.images === 'string') {
-        images.push(req.body.images)
-    } else {
-        images = req.body.images
+    if (req.files?.length) {
+        const imagesLinks = [];
+        try {
+            for (const image of req.files) {
+                const result = await cloudinary.v2.uploader.upload(image.path, {
+                    folder: 'products',
+                    width: 150,
+                    crop: 'scale',
+                });
+                imagesLinks.push({
+                    public_id: result.public_id,
+                    url: result.secure_url
+                });
+            }
+        } catch (error) {
+            console.error('Product image upload failed:', error.message);
+            return res.status(502).json({
+                success: false,
+                message: 'Product image upload failed. Check Cloudinary configuration and try again.'
+            });
+        } finally {
+            await Promise.all(req.files.map(async image => {
+                try {
+                    await fs.unlink(image.path);
+                } catch (error) {
+                    if (error.code !== 'ENOENT') {
+                        console.error('Failed to remove temporary product image:', error.message);
+                    }
+                }
+            }));
+        }
+        req.body.images = imagesLinks;
     }
-    // console.log(images)
 
-    let imagesLinks = [];
-    for (let i = 0; i < images.length; i++) {
-        const result = await cloudinary.v2.uploader.upload(images[i], {
-            folder: 'products',
-            width: 150,
-            crop: "scale",
+    try {
+        const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, {
+            new: true,
+            runValidators: true
         });
-        imagesLinks.push({
-            public_id: result.public_id,
-            url: result.secure_url
-        })
-
+        return res.status(200).json({
+            success: true,
+            product: updatedProduct
+        });
+    } catch (error) {
+        if (error.name === 'ValidationError' || error.name === 'CastError') {
+            return res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
+        console.error('Product update failed:', error.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Product could not be updated. Please try again.'
+        });
     }
-    req.body.images = imagesLinks
-    product = await Product.findByIdAndUpdate(req.params.id, req.body, {
-        new: true,
-        runValidators: true,
-        useFindandModify: false
-    })
-    // console.log(product)
-    return res.status(200).json({
-        success: true,
-        product
-    })
 }
 
 exports.deleteProduct = async (req, res, next) => {

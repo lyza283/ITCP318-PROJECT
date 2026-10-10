@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import MetaData from '../Layout/MetaData'
 import Sidebar from './SideBar'
 
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css'
-import axios from 'axios';
-import { getToken } from '../Utils/helpers';
+import adminApi from './adminApi'
 
 
 const UpdateProduct = () => {
@@ -19,11 +18,7 @@ const UpdateProduct = () => {
     const [images, setImages] = useState([]);
     const [oldImages, setOldImages] = useState([]);
     const [imagesPreview, setImagesPreview] = useState([])
-    const [error, setError] = useState('')
-    const [product, setProduct] = useState({})
     const [loading, setLoading] = useState(true)
-    const [updateError, setUpdateError] = useState('')
-    const [isUpdated, setIsUpdated] = useState(false)
 
     const categories = [
         'Electronics',
@@ -39,8 +34,8 @@ const UpdateProduct = () => {
         'Outdoor',
         'Home'
     ]
-    let { id } = useParams();
-    let navigate = useNavigate();
+    const { id } = useParams();
+    const navigate = useNavigate();
 
     const errMsg = (message = '') => toast.error(message, {
         position: 'bottom-right'
@@ -49,61 +44,34 @@ const UpdateProduct = () => {
         position: 'bottom-right'
     });
 
-    const getProductDetails = async (id) => {
-        try {
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/product/${id}`)
-            setProduct(data.product)
-            setLoading(false)
-
-        } catch (error) {
-            setError(error.response.data.message)
-
-        }
-    }
-
-    const updateProduct = async (id, productData) => {
-        try {
-
-            const config = {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${getToken()}`
-                }
-            }
-            const { data } = await axios.put(`${import.meta.env.VITE_API}/admin/product/${id}`, productData, config)
-            setIsUpdated(data.success)
-
-        } catch (error) {
-            setUpdateError(error.response.data.message)
-
-        }
-    }
     useEffect(() => {
-        if (product && product._id !== id) {
-            getProductDetails(id)
-        } else {
-            setName(product.name);
-            setPrice(product.price);
-            setDescription(product.description);
-            setCategory(product.category);
-            setSeller(product.seller);
-            setStock(product.stock)
-            setOldImages(product.images)
-        }
-        if (error) {
-            errMsg(error)
+        let active = true
+        adminApi.get(`/product/${id}`)
+            .then(({ data }) => {
+                if (active) {
+                    const product = data.product
+                    setName(product.name)
+                    setPrice(product.price)
+                    setDescription(product.description)
+                    setCategory(product.category)
+                    setSeller(product.seller)
+                    setStock(product.stock)
+                    setOldImages(product.images)
+                }
+            })
+            .catch(error => {
+                if (active) {
+                    errMsg(error.response?.data?.message || error.message || 'Unable to load product.')
+                }
+            })
+            .finally(() => {
+                if (active) setLoading(false)
+            })
 
+        return () => {
+            active = false
         }
-        if (updateError) {
-            errMsg(updateError);
-
-        }
-        if (isUpdated) {
-            navigate('/admin/products');
-            successMsg('Product updated successfully');
-
-        }
-    }, [error, isUpdated, updateError, product, id])
+    }, [id])
 
     const submitHandler = (e) => {
         e.preventDefault();
@@ -117,19 +85,29 @@ const UpdateProduct = () => {
         images.forEach(image => {
             formData.append('images', image)
         })
-        updateProduct(product._id, formData)
+        setLoading(true)
+        adminApi.put(`/admin/product/${id}`, formData)
+            .then(({ data }) => {
+                if (data.success) {
+                    navigate('/admin/products')
+                    successMsg('Product updated successfully')
+                }
+            })
+            .catch(error => {
+                errMsg(error.response?.data?.message || error.message || 'Unable to update product.')
+            })
+            .finally(() => setLoading(false))
     }
     const onChange = e => {
         const files = Array.from(e.target.files)
         setImagesPreview([]);
-        setImages([])
+        setImages(files)
         setOldImages([])
         files.forEach(file => {
             const reader = new FileReader();
             reader.onload = () => {
                 if (reader.readyState === 2) {
                     setImagesPreview(oldArray => [...oldArray, reader.result])
-                    setImages(oldArray => [...oldArray, reader.result])
                 }
             }
             reader.readAsDataURL(file)

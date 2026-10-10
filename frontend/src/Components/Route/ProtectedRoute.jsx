@@ -1,27 +1,33 @@
-import React, { useState } from 'react'
+import { useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
+import { useDispatch, useSelector } from 'react-redux'
 
 import Loader from '../Layout/Loader'
-import { getUser } from '../Utils/helpers'
+import { loadUser } from '../../actions/userActions'
 
 const ProtectedRoute = ({ children, isAdmin = false }) => {
-    const [loading, setLoading] = useState(getUser() === false && false)
+    const dispatch = useDispatch()
+    const { user, isAuthenticated, loading } = useSelector(state => state.auth)
 
-    const [user, setUser] = useState(getUser())
-
-    console.log(children.type.name, loading)
-
-    if (loading === false) {
-        if (!user) {
-            return <Navigate to='/login' />
+    useEffect(() => {
+        if (isAuthenticated === undefined && !loading) {
+            dispatch(loadUser())
         }
-        if (isAdmin === true && user.role !== 'admin') {
-            return <Navigate to='/' />
-        }
-        return children
+    }, [dispatch, isAuthenticated, loading])
+
+    if (loading || isAuthenticated === undefined) {
+        return <Loader />
     }
-    return <Loader />;
 
-};
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />
+    }
 
-export default ProtectedRoute;
+    if (isAdmin && user?.role !== 'admin') {
+        return <Navigate to="/" replace />
+    }
+
+    return children
+}
+
+export default ProtectedRoute

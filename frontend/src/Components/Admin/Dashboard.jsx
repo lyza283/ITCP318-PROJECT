@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom';
 
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
 import Sidebar from './SideBar'
-import { getToken } from '../Utils/helpers';
-import axios from 'axios'
+import adminApi from './adminApi'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ProductSalesChart from './ProductSalesChart';
@@ -16,7 +15,6 @@ import MonthlySalesChart from './MonthlySalesChart';
 const Dashboard = () => {
 
     const [products, setProducts] = useState([])
-    const [error, setError] = useState('')
     // const [users, setUsers] = useState([])
     // const [orders, setOrders] = useState([])
     const [loading, setLoading] = useState(true)
@@ -27,30 +25,26 @@ const Dashboard = () => {
             outOfStock += 1;
         }
     })
-    const getAdminProducts = async () => {
-        try {
-
-            const config = {
-                headers: {
-                    'Authorization': `Bearer ${getToken()}`
-                }
-            }
-
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/products`, config)
-            console.log(data)
-            setProducts(data.products)
-            setLoading(false)
-        } catch (error) {
-
-            setError(error.response.data.message)
-
-        }
-    }
-
     useEffect(() => {
-        getAdminProducts()
-        // allOrders()
-        // allUsers()
+        let active = true
+        adminApi.get('/admin/products')
+            .then(({ data }) => {
+                if (active) setProducts(data.products)
+            })
+            .catch(error => {
+                if (active) {
+                    toast.error(error.response?.data?.message || error.message || 'Unable to load dashboard data.', {
+                        position: 'bottom-right'
+                    })
+                }
+            })
+            .finally(() => {
+                if (active) setLoading(false)
+            })
+
+        return () => {
+            active = false
+        }
     }, [])
 
     return (

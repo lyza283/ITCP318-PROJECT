@@ -44,7 +44,8 @@ export const register = (userData) => async (dispatch) => {
         const config = {
             headers: {
                 'Content-Type': 'multipart/form-data'
-            }
+            },
+            withCredentials: true
         }
         const { data } = await axios.post(`${import.meta.env.VITE_API}/register`, userData, config)
 
@@ -55,7 +56,7 @@ export const register = (userData) => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: REGISTER_USER_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || error.message || 'Unable to register. Please try again.'
         })
     }
 }

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MetaData from '../Layout/MetaData'
+import { toast } from 'react-toastify'
 // import axios from 'axios'
 import { useDispatch, useSelector } from 'react-redux'
 import { register, clearErrors } from '../../actions/userActions'
@@ -37,12 +38,12 @@ const Register = () => {
         }
 
         if (error) {
-            console.log(error)
+            toast.error(error)
             dispatch(clearErrors());
 
         }
 
-    }, [error, navigate, isAuthenticated])
+    }, [error, navigate, isAuthenticated, dispatch])
 
     const submitHandler = (e) => {
         e.preventDefault();
@@ -121,6 +122,7 @@ const Register = () => {
                                 name='name'
                                 value={name}
                                 onChange={onChange}
+                                required
                             />
                         </div>
 
@@ -133,6 +135,7 @@ const Register = () => {
                                 name='email'
                                 value={email}
                                 onChange={onChange}
+                                required
                             />
                         </div>
 
@@ -145,6 +148,8 @@ const Register = () => {
                                 name='password'
                                 value={password}
                                 onChange={onChange}
+                                minLength={6}
+                                required
                             />
                         </div>
 
@@ -166,8 +171,9 @@ const Register = () => {
                                         name='avatar'
                                         className='custom-file-input'
                                         id='customFile'
-                                        accept="images/*"
+                                        accept="image/*"
                                         onChange={onChange}
+                                        required
                                     />
                                     <label className='custom-file-label' htmlFor='customFile'>
                                         Choose Avatar
@@ -180,9 +186,9 @@ const Register = () => {
                             id="register_button"
                             type="submit"
                             className="btn btn-block py-3"
-                        // disabled={loading ? false : true}
+                            disabled={loading}
                         >
-                            REGISTER
+                            {loading ? 'REGISTERING...' : 'REGISTER'}
                         </button>
                     </form>
                 </div>

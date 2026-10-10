@@ -1,7 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { getToken } from "../Utils/helpers";
-import axios from "axios";
-import Loader from '../Layout/Loader';
+import { useState, useEffect } from 'react'
+import adminApi from './adminApi'
 
 import { PieChart, Pie, Legend, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -33,7 +31,7 @@ export default function ProductSalesChart() {
     // console.log(data)
 
     const RADIAN = Math.PI / 180;
-    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
         const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
         const x = cx + radius * Math.cos(-midAngle * RADIAN);
         const y = cy + radius * Math.sin(-midAngle * RADIAN);
@@ -44,27 +42,26 @@ export default function ProductSalesChart() {
             </text>
         );
     };
-    const productSales = async () => {
-        try {
-            const config = {
-                headers: {
-
-                    'Authorization': `Bearer ${getToken()}`
-                }
-            }
-
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/product-sales`, config)
-            setSales(data.totalPercentage)
-
-        } catch (error) {
-            setError(error.response.data.message)
-
-        }
-    }
     useEffect(() => {
-        productSales()
+        let active = true
+        adminApi.get('/admin/product-sales')
+            .then(({ data }) => {
+                if (active) setSales(data.totalPercentage)
+            })
+            .catch(error => {
+                if (active) setError(error.response?.data?.message || error.message || 'Unable to load product sales.')
+            })
+            .finally(() => {
+                if (active) setLoading(false)
+            })
+
+        return () => {
+            active = false
+        }
     }, [])
 
+    if (loading) return <div className="text-center">Loading product sales...</div>
+    if (error) return <div className="alert alert-danger">{error}</div>
 
     return (
         <ResponsiveContainer width="90%" height={1000}>

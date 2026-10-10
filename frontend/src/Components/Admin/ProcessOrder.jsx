@@ -1,85 +1,58 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate, } from 'react-router-dom'
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
 import Sidebar from './SideBar'
-
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import axios from 'axios'
-import { getToken } from '../Utils/helpers'
+import adminApi from './adminApi'
 
 const ProcessOrder = () => {
 
     const [status, setStatus] = useState('')
     const [loading, setLoading] = useState(true)
-    const [error, setError] = useState('')
     const [order, setOrder] = useState({})
-    const [isUpdated, setIsUpdated] = useState(false)
-    let navigate = useNavigate()
+    const navigate = useNavigate()
 
-    let { id } = useParams();
+    const { id } = useParams();
     const { shippingInfo, orderItems, paymentInfo, user, totalPrice, orderStatus } = order
     const orderId = id;
-    const errMsg = (message = '') => toast.error(message, {
-        position: 'bottom-center'
-    });
-
-    const successMsg = (message = '') => toast.success(message, {
-        position: 'bottom-center'
-    });
-
-    const getOrderDetails = async (id) => {
-        try {
-            const config = {
-                headers: {
-
-                    'Authorization': `Bearer ${getToken()}`
-                }
-            }
-
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/order/${id}`, config)
-            setOrder(data.order)
-            setLoading(false)
-        } catch (error) {
-            setError(error.response.data.message)
-        }
-    }
     const updateOrder = async (id, formData) => {
-
         try {
-            const config = {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${getToken()}`
-                }
-            }
-            const { data } = await axios.put(`${import.meta.env.VITE_API}/admin/order/${id}`, formData, config)
-            setIsUpdated(data.success)
-
-
+            await adminApi.put(`/admin/order/${id}`, formData)
+            toast.success('Order updated successfully', { position: 'bottom-center' })
+            navigate('/admin/orders')
         } catch (error) {
-            setError(error.response.data.message)
+            toast.error(error.response?.data?.message || error.message || 'Unable to update order.', {
+                position: 'bottom-center'
+            })
         }
     }
 
     useEffect(() => {
-        getOrderDetails(orderId)
-        if (error) {
-            errMsg(error);
-            setError('')
+        let active = true
+        adminApi.get(`/order/${orderId}`)
+            .then(({ data }) => {
+                if (active) setOrder(data.order)
+            })
+            .catch(error => {
+                if (active) {
+                    toast.error(error.response?.data?.message || error.message || 'Unable to load order.', {
+                        position: 'bottom-center'
+                    })
+                }
+            })
+            .finally(() => {
+                if (active) setLoading(false)
+            })
+
+        return () => {
+            active = false
         }
-        if (isUpdated) {
-            successMsg('Order updated successfully');
-            setIsUpdated('')
-            navigate('/admin/orders')
-        }
-    }, [error, isUpdated, orderId])
+    }, [orderId])
 
     const updateOrderHandler = (id) => {
-        const formData = new FormData();
-        formData.set('status', status);
-        updateOrder(id, formData)
+        updateOrder(id, { status })
     }
 
     const shippingDetails = shippingInfo && `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postalCode}, ${shippingInfo.country}`

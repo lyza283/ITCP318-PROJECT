@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MetaData from '../Layout/MetaData'
 import Sidebar from './SideBar'
-import { getToken } from '../Utils/helpers'
-import axios from 'axios'
+import adminApi from './adminApi'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -12,15 +11,14 @@ const NewProduct = () => {
     const [name, setName] = useState('');
     const [price, setPrice] = useState(0);
     const [description, setDescription] = useState('');
-    const [category, setCategory] = useState('');
+    const [category, setCategory] = useState('Electronics');
     const [stock, setStock] = useState(0);
     const [seller, setSeller] = useState('');
     const [images, setImages] = useState([]);
     const [imagesPreview, setImagesPreview] = useState([])
     const [error, setError] = useState('')
-    const [loading, setLoading] = useState(true)
+    const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState('')
-    const [product, setProduct] = useState({})
 
     const categories = [
         'Electronics',
@@ -60,13 +58,12 @@ const NewProduct = () => {
     const onChange = e => {
         const files = Array.from(e.target.files)
         setImagesPreview([]);
-        setImages([])
+        setImages(files)
         files.forEach(file => {
             const reader = new FileReader();
             reader.onload = () => {
                 if (reader.readyState === 2) {
                     setImagesPreview(oldArray => [...oldArray, reader.result])
-                    setImages(oldArray => [...oldArray, reader.result])
                 }
             }
 
@@ -78,19 +75,13 @@ const NewProduct = () => {
     const newProduct = async (formData) => {
 
         try {
-            const config = {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${getToken()}`
-                }
-            }
-
-            const { data } = await axios.post(`${import.meta.env.VITE_API}/admin/product/new`, formData, config)
+            setLoading(true)
+            const { data } = await adminApi.post('/admin/product/new', formData)
             setLoading(false)
             setSuccess(data.success)
-            setProduct(data.product)
         } catch (error) {
-            setError(error.response.data.message)
+            setLoading(false)
+            setError(error.response?.data?.message || error.message || 'Unable to create product. Please try again.')
 
         }
     }
@@ -110,7 +101,7 @@ const NewProduct = () => {
 
         }
 
-    }, [error, success,])
+    }, [error, success, navigate])
 
 
     return (
@@ -213,9 +204,9 @@ const NewProduct = () => {
                                     id="login_button"
                                     type="submit"
                                     className="btn btn-block py-3"
-                                // disabled={loading ? true : false}
+                                    disabled={loading}
                                 >
-                                    CREATE
+                                    {loading ? 'CREATING...' : 'CREATE'}
                                 </button>
 
                             </form>

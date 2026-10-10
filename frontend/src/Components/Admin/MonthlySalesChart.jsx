@@ -1,35 +1,32 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { getToken } from "../Utils/helpers";
-import axios from "axios";
-import Loader from '../Layout/Loader';
+import adminApi from './adminApi'
 
 export default function MonthlySalesChart() {
     const [sales, setSales] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
-    const monthlySales = async () => {
-        try {
-            const config = {
-                headers: {
 
-                    'Authorization': `Bearer ${getToken()}`
-                }
-            }
-
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/sales-per-month`, config)
-            setSales(data.salesPerMonth)
-            // console.log(data.salesPerMonth)
-            setLoading(false)
-
-        } catch (error) {
-            setError(error.response.data.message)
-        }
-    }
     useEffect(() => {
-        monthlySales()
+        let active = true
+        adminApi.get('/admin/sales-per-month')
+            .then(({ data }) => {
+                if (active) setSales(data.salesPerMonth)
+            })
+            .catch(error => {
+                if (active) setError(error.response?.data?.message || error.message || 'Unable to load monthly sales.')
+            })
+            .finally(() => {
+                if (active) setLoading(false)
+            })
 
+        return () => {
+            active = false
+        }
     }, [])
+
+    if (loading) return <div className="text-center">Loading monthly sales...</div>
+    if (error) return <div className="alert alert-danger">{error}</div>
 
     return (
         <ResponsiveContainer width="90%" height={600}>

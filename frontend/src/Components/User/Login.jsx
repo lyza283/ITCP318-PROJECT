@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react'
-import { Link, useNavigate, useLocation, useParams } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 
 import Loader from '../Layout/Loader'
 import MetaData from '../Layout/MetaData';
-import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 // import axios from 'axios';
 // import { getUser, authenticate } from '../Utils/helpers';
@@ -11,7 +10,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { login, clearErrors } from '../../actions/userActions'
 
 const Login = () => {
-    const { isAuthenticated, error, loading, } = useSelector(state => state.auth)
+    const { isAuthenticated, error, loading, user } = useSelector(state => state.auth)
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     // const [loading, setLoading] = useState(false)
@@ -60,15 +59,17 @@ const Login = () => {
     useEffect(() => {
         if (isAuthenticated && redirect === 'shipping') {
             navigate(`/${redirect}`)
-        }
-        else if (isAuthenticated)
+        } else if (isAuthenticated && user?.role === 'admin') {
+            navigate('/dashboard')
+        } else if (isAuthenticated) {
             navigate('/')
+        }
         if (error) {
             // alert.error(error);
             console.log(error)
             dispatch(clearErrors());
         }
-    }, [error, isAuthenticated, dispatch, navigate, redirect])
+    }, [error, isAuthenticated, user, dispatch, navigate, redirect])
 
     return (
         <>

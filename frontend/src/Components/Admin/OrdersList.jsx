@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import MetaData from '../Layout/MetaData'
@@ -7,15 +7,12 @@ import Sidebar from './SideBar'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { DataGrid, } from '@mui/x-data-grid'
-import { getToken } from '../Utils/helpers'
-import axios from 'axios'
+import adminApi from './adminApi'
 
 const OrdersList = () => {
     let navigate = useNavigate();
     const [loading, setLoading] = useState(true)
-    const [error, setError] = useState('')
     const [allOrders, setAllOrders] = useState([])
-    const [isDeleted, setIsDeleted] = useState(false)
     const errMsg = (message = '') => toast.error(message, {
         position: 'bottom-right'
     });
@@ -23,48 +20,35 @@ const OrdersList = () => {
         position: 'bottom-right'
     });
 
-    const listOrders = async () => {
-        try {
-            const config = {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${getToken()}`
-                }
-            }
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/orders`, config)
-            setAllOrders(data.orders)
-            setLoading(false)
-        } catch (error) {
-            setError(error.response.data.message)
-        }
-    }
     const deleteOrder = async (id) => {
         try {
-            const config = {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${getToken()}`
-                }
+            const { data } = await adminApi.delete(`/admin/order/${id}`)
+            if (data.success) {
+                successMsg('Order deleted successfully')
+                navigate('/admin/orders')
             }
-            const { data } = await axios.delete(`${import.meta.env.VITE_API}/admin/order/${id}`, config)
-            setIsDeleted(data.success)
-            setLoading(false)
         } catch (error) {
-            setError(error.response.data.message)
-
+            errMsg(error.response?.data?.message || error.message || 'Unable to delete order.')
         }
     }
     useEffect(() => {
-        listOrders()
-        if (error) {
-            errMsg(error)
-            setError('')
+        let active = true
+        adminApi.get('/admin/orders')
+            .then(({ data }) => {
+                if (active) setAllOrders(data.orders)
+            })
+            .catch(error => {
+                if (active) errMsg(error.response?.data?.message || error.message || 'Unable to load orders.')
+            })
+            .finally(() => {
+                if (active) setLoading(false)
+            })
+
+        return () => {
+            active = false
         }
-        if (isDeleted) {
-            successMsg('Order deleted successfully');
-            navigate('/admin/orders');
-        }
-    }, [error, isDeleted])
+    }, [])
+
     const deleteOrderHandler = (id) => {
         deleteOrder(id)
     }

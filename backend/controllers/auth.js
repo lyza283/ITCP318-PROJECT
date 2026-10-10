@@ -5,24 +5,73 @@ const sendEmail = require('../utils/sendEmail')
 const sendToken = require('../utils/jwtToken');
 
 exports.registerUser = async (req, res, next) => {
-    console.log(req.body)
-    const result = await cloudinary.v2.uploader.upload(req.body.avatar, {
-        folder: 'avatars',
-        width: 150,
-        crop: "scale"
-    }, (err, res) => {
-        console.log(err, res);
-    });
-    const { name, email, password, } = req.body;
-    const user = await User.create({
-        name,
-        email,
-        password,
-        avatar: {
-            public_id: result.public_id,
-            url: result.secure_url
-        },
-    })
+    const { name, email, password, avatar } = req.body;
+    if (!process.env.JWT_SECRET) {
+        return res.status(503).json({
+            message: 'Authentication is not configured. Set JWT_SECRET in backend/config/.env.'
+        });
+    }
+
+    if (await User.exists({ email })) {
+        return res.status(409).json({
+            message: 'An account with this email already exists. Please log in instead.'
+        });
+    }
+
+    const cloudinaryConfigured = [
+        process.env.CLOUDINARY_CLOUD_NAME,
+        process.env.CLOUDINARY_API_KEY,
+        process.env.CLOUDINARY_API_SECRET
+    ].every(Boolean);
+
+    if (!cloudinaryConfigured) {
+        return res.status(503).json({
+            message: 'Avatar uploads are not configured. Set the Cloudinary credentials in backend/config/.env.'
+        });
+    }
+
+    if (!avatar) {
+        return res.status(400).json({ message: 'Please choose an avatar image.' });
+    }
+
+    let result;
+    try {
+        result = await cloudinary.v2.uploader.upload(avatar, {
+            folder: 'avatars',
+            width: 150,
+            crop: 'scale'
+        });
+    } catch (error) {
+        console.error('Cloudinary avatar upload failed:', error.message);
+        const message = error.message.includes('cloud_name')
+            ? 'Cloudinary rejected CLOUDINARY_CLOUD_NAME. Use the exact Cloud Name shown in your Cloudinary dashboard.'
+            : 'Avatar upload failed. Check the Cloudinary credentials and try again.';
+        return res.status(502).json({ message });
+    }
+
+    let user;
+    try {
+        user = await User.create({
+            name,
+            email,
+            password,
+            avatar: {
+                public_id: result.public_id,
+                url: result.secure_url
+            },
+        });
+    } catch (error) {
+        if (error.code === 11000) {
+            return res.status(409).json({
+                message: 'An account with this email already exists. Please log in instead.'
+            });
+        }
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ message: error.message });
+        }
+        console.error('User registration failed:', error.message);
+        return res.status(500).json({ message: 'Registration failed. Please try again.' });
+    }
     //test token
     // const token = user.getJwtToken();
 

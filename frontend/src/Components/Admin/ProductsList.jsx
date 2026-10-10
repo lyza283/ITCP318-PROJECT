@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
 import Sidebar from './SideBar'
-import { getToken } from '../Utils/helpers';
-import axios from 'axios'
+import adminApi from './adminApi'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { DataGrid, } from '@mui/x-data-grid'
@@ -19,29 +18,33 @@ const ProductsList = () => {
     const [loading, setLoading] = useState(true)
     const [isDeleted, setIsDeleted] = useState(false)
 
-    let navigate = useNavigate()
-    const getAdminProducts = async () => {
-        try {
+    const navigate = useNavigate()
 
-            const config = {
-                headers: {
-                    'Authorization': `Bearer ${getToken()}`
-                }
-            }
-
-            const { data } = await axios.get(`${import.meta.env.VITE_API}/admin/products`, config)
-            console.log(data)
-            setProducts(data.products)
-            setLoading(false)
-        } catch (error) {
-
-            setError(error.response.data.message)
-
-        }
-    }
     useEffect(() => {
-        getAdminProducts()
+        let active = true
+        adminApi.get('/admin/products')
+            .then(({ data }) => {
+                if (active) {
+                    setProducts(data.products)
+                }
+            })
+            .catch(error => {
+                if (active) {
+                    setError(error.response?.data?.message || error.message || 'Unable to load products.')
+                }
+            })
+            .finally(() => {
+                if (active) {
+                    setLoading(false)
+                }
+            })
 
+        return () => {
+            active = false
+        }
+    }, [])
+
+    useEffect(() => {
         if (error) {
             toast.error(error, {
                 position: 'bottom-right'
@@ -59,24 +62,16 @@ const ProductsList = () => {
                 position: 'bottom-right'
             })
             navigate('/admin/products');
-
         }
-
-    }, [error, deleteError, isDeleted,])
+    }, [error, deleteError, isDeleted, navigate])
 
     const deleteProduct = async (id) => {
         try {
-            const config = {
-                headers: {
-                    'Authorization': `Bearer ${getToken()}`
-                }
-            }
-            const { data } = await axios.delete(`${import.meta.env.VITE_API}/admin/product/${id}`, config)
+            const { data } = await adminApi.delete(`/admin/product/${id}`)
 
             setIsDeleted(data.success)
-            setLoading(false)
         } catch (error) {
-            setDeleteError(error.response.data.message)
+            setDeleteError(error.response?.data?.message || error.message || 'Unable to delete product.')
 
         }
     }
