@@ -2,7 +2,6 @@ import { useState } from 'react'
 
 
 import MetaData from '../Layout/MetaData'
-import Sidebar from './SideBar'
 // import Toast from '../Layout/Toast'
 import Swal from 'sweetalert2'
 import { errMsg, successMsg } from '../Utils/helpers'
@@ -113,52 +112,46 @@ const ProductReviews = () => {
     return (
         <>
             <MetaData title={'Product Reviews'} />
-            <div className="row">
-                <div className="col-12 col-md-2">
-                    <Sidebar />
-                </div>
-                <div className="col-12 col-md-10">
-                    <>
-                        <div className="row justify-content-center mt-5">
-                            <div className="col-5">
-                                <form onSubmit={submitHandler}>
-                                    <div className="form-group">
-                                        <label htmlFor="productId_field">Enter Product ID</label>
-                                        <input
-                                            type="text"
-                                            id="productId_field"
-                                            className="form-control"
-                                            value={productId}
-                                            onChange={(e) => setProductId(e.target.value)}
-                                        />
-                                    </div>
-                                    <button
-                                        id="search_button"
-                                        type="submit"
-                                        className="btn btn-primary btn-block py-2"
-                                    >
-                                        SEARCH
-                                    </button>
-                                </ form>
-                            </div>
-                        </div>
-                        {listReviews && listReviews.length > 0 ? (
-                            <DataGrid
-                                rows={rows}
-                                columns={columns}
-
-                                pageSize={5}
-                                rowsPerPageOptions={[5, 10, 25]}
-                                disableSelectionOnClick
-                                getRowId={(row) => row.id}
-                                showToolbar
+            <main className="admin-page-content">
+                <h1 className="admin-page-title">Product Reviews</h1>
+                <div className="review-search-panel">
+                    <form onSubmit={submitHandler}>
+                        <div className="form-group">
+                            <label htmlFor="productId_field">Enter Product ID</label>
+                            <input
+                                type="text"
+                                id="productId_field"
+                                className="form-control"
+                                value={productId}
+                                onChange={(e) => setProductId(e.target.value)}
                             />
-                        ) : (
-                            <p className="mt-5 text-center">No Reviews.</p>
-                        )}
-                    </>
+                        </div>
+                        <button
+                            id="search_button"
+                            type="submit"
+                            className="btn btn-primary btn-block py-2"
+                        >
+                            SEARCH REVIEWS
+                        </button>
+                    </form>
                 </div>
-            </div>
+                {listReviews && listReviews.length > 0 ? (
+                    <div className="admin-data-grid">
+                        <DataGrid
+                            rows={rows}
+                            columns={columns}
+
+                            pageSize={5}
+                            rowsPerPageOptions={[5, 10, 25]}
+                            disableSelectionOnClick
+                            getRowId={(row) => row.id}
+                            showToolbar
+                        />
+                    </div>
+                ) : (
+                    <p className="admin-empty-state">Search by product ID to view reviews.</p>
+                )}
+            </main>
         </>
     )
 }

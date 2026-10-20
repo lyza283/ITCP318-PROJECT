@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import MetaData from '../Layout/MetaData'
 import { useNavigate } from "react-router-dom";
-import axios from 'axios';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { updateProfile, loadUser, clearErrors } from '../../actions/userActions'
 
 import { UPDATE_PROFILE_RESET } from '../../constants/userConstants'
 import { useDispatch, useSelector } from 'react-redux'
+import { profileSchema } from '../../validation/schemas'
 
 // import { getToken } from '../Utils/helpers';
 
@@ -18,10 +18,10 @@ const UpdateProfile = () => {
     const { error, isUpdated, loading } = useSelector(state => state.user)
 
 
-    const [name, setName] = useState('')
-    const [email, setEmail] = useState('')
+    const [name, setName] = useState(user?.name || '')
+    const [email, setEmail] = useState(user?.email || '')
     const [avatar, setAvatar] = useState('')
-    const [avatarPreview, setAvatarPreview] = useState('/images/default_avatar.jpg')
+    const [avatarPreview, setAvatarPreview] = useState(user?.avatar?.url || '/images/default_avatar.jpg')
     // const [error, setError] = useState('')
     // const [user, setUser] = useState({})
     // const [loading, setLoading] = useState(false)
@@ -84,15 +84,8 @@ const UpdateProfile = () => {
     // }, [])
 
     useEffect(() => {
-        console.log(user)
-        if (user) {
-            setName(user.name);
-            setEmail(user.email);
-            setAvatarPreview(user.avatar.url)
-        }
         if (error) {
-            // alert.error(error);
-            console.log(error)
+            toast.error(error)
             dispatch(clearErrors());
         }
         if (isUpdated) {
@@ -103,10 +96,17 @@ const UpdateProfile = () => {
                 type: UPDATE_PROFILE_RESET
             })
         }
-    }, [dispatch, error, isUpdated, navigate, user])
+    }, [dispatch, error, isUpdated, navigate])
 
-    const submitHandler = (e) => {
+    const submitHandler = async (e) => {
         e.preventDefault();
+        try {
+            await profileSchema.validate({ name, email }, { abortEarly: false })
+        } catch (validationError) {
+            toast.error(validationError.errors[0])
+            return
+        }
+
         const formData = new FormData();
         formData.set('name', name);
         formData.set('email', email);
@@ -169,7 +169,7 @@ const UpdateProfile = () => {
                                 <div>
                                     <figure className='avatar mr-3 item-rtl'>
                                         <img
-                                            src={avatarPreview}
+                                            src={avatarPreview || '/images/default_avatar.jpg'}
                                             className='rounded-circle'
                                             alt='Avatar Preview'
                                         />
@@ -191,7 +191,7 @@ const UpdateProfile = () => {
                             </div>
                         </div>
 
-                        <button type="submit" className="btn update-btn btn-block mt-4 mb-3" disabled={loading ? true : false} >Update</button>
+                        <button type="submit" className="btn update-btn btn-block mt-4 mb-3" disabled={loading} >Update</button>
                     </form>
                 </div>
             </div>

@@ -5,6 +5,14 @@ import {
     PRODUCT_DETAILS_REQUEST,
     PRODUCT_DETAILS_SUCCESS,
     PRODUCT_DETAILS_FAIL,
+    NEW_PRODUCT_REQUEST,
+    NEW_PRODUCT_SUCCESS,
+    NEW_PRODUCT_FAIL,
+    NEW_PRODUCT_RESET,
+    NEW_REVIEW_REQUEST,
+    NEW_REVIEW_SUCCESS,
+    NEW_REVIEW_FAIL,
+    NEW_REVIEW_RESET,
 
     CLEAR_ERRORS
 } from '../constants/productConstants'
@@ -16,6 +24,7 @@ export const productsReducer = (state = { products: [] }, action) => {
             return {
                 ...state,
                 loading: true,
+                error: null,
                 products: []
             }
         case ALL_PRODUCTS_SUCCESS:
@@ -73,6 +82,7 @@ export const productDetailsReducer = (state = { product: {} }, action) => {
         case PRODUCT_DETAILS_FAIL:
             return {
                 ...state,
+                loading: false,
                 error: action.payload
             }
 

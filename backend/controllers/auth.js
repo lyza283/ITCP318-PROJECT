@@ -3,6 +3,7 @@ const crypto = require('crypto')
 const cloudinary = require('cloudinary')
 const sendEmail = require('../utils/sendEmail')
 const sendToken = require('../utils/jwtToken');
+const { OAuth2Client } = require('google-auth-library');
 
 exports.registerUser = async (req, res, next) => {
     const { name, email, password, avatar } = req.body;
@@ -83,19 +84,69 @@ exports.registerUser = async (req, res, next) => {
     sendToken(user, 200, res)
 }
 
-exports.loginUser = async (req, res, next) => {
-    const { email, password } = req.body;
-
-    // Checks if email and password is entered by user
-    if (!email || !password) {
-        return res.status(400).json({ error: 'Please enter email & password' })
+exports.googleLogin = async (req, res) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const credential = req.body?.credential;
+    if (!clientId) {
+        return res.status(503).json({
+            message: 'Google sign-in is not configured. Set GOOGLE_CLIENT_ID in the backend environment.'
+        });
+    }
+    if (typeof credential !== 'string' || !credential) {
+        return res.status(400).json({ message: 'Google did not provide a valid sign-in credential.' });
+    }
+    if (!process.env.JWT_SECRET) {
+        return res.status(503).json({ message: 'Authentication is not configured on the server.' });
     }
 
+    let payload;
+    try {
+        const client = new OAuth2Client(clientId);
+        const ticket = await client.verifyIdToken({ idToken: credential, audience: clientId });
+        payload = ticket.getPayload();
+    } catch (error) {
+        console.error('Google sign-in failed:', error.message);
+        return res.status(401).json({ message: 'Google sign-in could not be verified. Please try again.' });
+    }
+    if (!payload?.sub || !payload.email || payload.email_verified !== true) {
+        return res.status(401).json({ message: 'Google did not verify the account email.' });
+    }
+
+    let user = await User.findOne({ googleId: payload.sub });
+    if (!user) {
+        user = await User.findOne({ email: payload.email.toLowerCase() });
+        if (user) {
+            user.googleId = payload.sub;
+            if (payload.picture && user.avatar?.public_id === 'google') {
+                user.avatar.url = payload.picture;
+            }
+            await user.save();
+        } else {
+            user = await User.create({
+                name: payload.name || payload.email.split('@')[0],
+                email: payload.email.toLowerCase(),
+                googleId: payload.sub,
+                avatar: {
+                    public_id: 'google',
+                    url: payload.picture || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/images/default_avatar.jpg`
+                }
+            });
+        }
+    }
+
+    return sendToken(user, 200, res);
+};
+
+exports.loginUser = async (req, res, next) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Please enter email & password' });
+    }
 
     // Finding user in database
 
     let user = await User.findOne({ email }).select('+password')
-    if (!user) {
+    if (!user?.password) {
         return res.status(401).json({ message: 'Invalid Email or Password' })
     }
 
@@ -208,7 +259,9 @@ exports.updateProfile = async (req, res, next) => {
         let user = await User.findById(req.user.id)
         // console.log(user)
         const image_id = user.avatar.public_id;
-        const res = await cloudinary.v2.uploader.destroy(image_id);
+        if (image_id !== 'google') {
+            await cloudinary.v2.uploader.destroy(image_id);
+        }
         // console.log("Res", res)
         const result = await cloudinary.v2.uploader.upload(req.body.avatar, {
             folder: 'avatars',

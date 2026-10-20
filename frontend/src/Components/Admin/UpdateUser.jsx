@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from "react-router-dom";
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
-import Sidebar from './SideBar'
 
 import { errMsg, successMsg } from '../Utils/helpers'
 import adminApi from './adminApi'
@@ -59,14 +58,10 @@ const UpdateUser = () => {
     return (
         <>
             <MetaData title={`Update User`} />
-            <div className="row">
-                <div className="col-12 col-md-2">
-                    <Sidebar />
-                </div>
-                <div className="col-12 col-md-10">
-                    {loading ? <Loader /> : <div className="row wrapper">
-                        <div className="col-10 col-lg-5">
-                            <form className="shadow-lg" onSubmit={submitHandler}>
+            <main className="admin-page-content">
+                {loading ? <Loader /> : <div className="row wrapper">
+                    <div className="col-10 col-lg-5">
+                        <form className="shadow-lg" onSubmit={submitHandler}>
                                 <h1 className="mt-2 mb-5">Update User</h1>
                                 <div className="form-group">
                                     <label htmlFor="name_field">Name</label>
@@ -104,11 +99,10 @@ const UpdateUser = () => {
                                     </select>
                                 </div>
                                 <button type="submit" className="btn update-btn btn-block mt-4 mb-3" disabled={loading}>Update</button>
-                            </form>
-                        </div>
-                    </div>}
-                </div>
-            </div>
+                        </form>
+                    </div>
+                </div>}
+            </main>
         </>
     )
 }

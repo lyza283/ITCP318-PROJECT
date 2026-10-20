@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 
 import Loader from '../Layout/Loader'
@@ -8,6 +8,7 @@ import { loadUser } from '../../actions/userActions'
 const ProtectedRoute = ({ children, isAdmin = false }) => {
     const dispatch = useDispatch()
     const { user, isAuthenticated, loading } = useSelector(state => state.auth)
+    const location = useLocation()
 
     useEffect(() => {
         if (isAuthenticated === undefined && !loading) {
@@ -20,7 +21,8 @@ const ProtectedRoute = ({ children, isAdmin = false }) => {
     }
 
     if (!isAuthenticated) {
-        return <Navigate to="/login" replace />
+        const redirect = location.pathname.slice(1)
+        return <Navigate to={`/login?redirect=${encodeURIComponent(redirect)}`} replace />
     }
 
     if (isAdmin && user?.role !== 'admin') {

@@ -1,9 +1,6 @@
-import { useState } from 'react'
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { ToastContainer, } from 'react-toastify';
-import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import axios from 'axios';
 
 import { Header } from './Components/Layout/Header'
 import Footer from './Components/Layout/Footer'
@@ -138,21 +135,21 @@ function App() {
           <Route path="/payment" element={<Payment cartItems={state.cartItems} shippingInfo={state.shippingInfo} />} /> */}
 
           <Route path="/cart" element={<Cart />} exact="true" />
-          <Route path="/shipping" element={<Shipping />} />
-          <Route path="/confirm" element={<ConfirmOrder />} />
-          <Route path="/payment" element={<Payment />} />
+          <Route path="/shipping" element={<ProtectedRoute><Shipping /></ProtectedRoute>} />
+          <Route path="/confirm" element={<ProtectedRoute><ConfirmOrder /></ProtectedRoute>} />
+          <Route path="/payment" element={<ProtectedRoute><Payment /></ProtectedRoute>} />
 
 
           <Route path="/success" element={<OrderSuccess />} />
-          <Route path="/orders/me" element={<ListOrders />} />
-          <Route path="/order/:id" element={<OrderDetails />} />
+          <Route path="/orders/me" element={<ProtectedRoute><ListOrders /></ProtectedRoute>} />
+          <Route path="/order/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
 
           {/* <Route path="/dashboard" element={<Dashboard />} /> */}
           {/* <Route path="/admin/products" element={<ProductsList />} /> */}
-          <Route path="/admin/product" element={<NewProduct />} />
+          <Route path="/admin/product" element={<ProtectedRoute isAdmin={true}><NewProduct /></ProtectedRoute>} />
           <Route
             path="/admin/product/:id"
-            element={<UpdateProduct />} />
+            element={<ProtectedRoute isAdmin={true}><UpdateProduct /></ProtectedRoute>} />
           {/* <Route
             path="/admin/orders"
             element={<OrdersList />}
@@ -160,11 +157,11 @@ function App() {
           /> */}
           <Route
             path="/admin/order/:id"
-            element={<ProcessOrder />} />
+            element={<ProtectedRoute isAdmin={true}><ProcessOrder /></ProtectedRoute>} />
           {/* <Route
             path="/admin/users"
             element={<UsersList />} /> */}
-          <Route path="/admin/user/:id" element={<UpdateUser />} />
+          <Route path="/admin/user/:id" element={<ProtectedRoute isAdmin={true}><UpdateUser /></ProtectedRoute>} />
 
           <Route
             path="/admin/products"

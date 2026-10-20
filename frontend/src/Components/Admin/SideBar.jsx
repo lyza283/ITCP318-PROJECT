@@ -1,42 +1,34 @@
-import React from 'react'
-import { Link } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 
 const Sidebar = () => {
+    const { pathname } = useLocation()
+
     return (
-        <div className="sidebar-wrapper">
-            <nav id="sidebar">
-                <ul className="list-unstyled components">
-                    <li>
-                        <Link to="/dashboard"><i className="fa fa-tachometer"></i> Dashboard</Link>
-                    </li>
-
-                    <li>
-                        <a href="#productSubmenu" data-toggle="collapse" aria-expanded="false" className="dropdown-toggle"><i
-                            className="fa fa-product-hunt"></i> Products</a>
-                        <ul className="collapse list-unstyled" id="productSubmenu">
-                            <li>
-                                <Link to="/admin/products"><i className="fa fa-clipboard"></i> All</Link>
-                            </li>
-
-                            <li>
-                                <Link to="/admin/product"><i className="fa fa-plus"></i> Create</Link>
-                            </li>
-                        </ul>
-                    </li>
-
-                    <li>
-                        <Link to="/admin/orders"><i className="fa fa-shopping-basket"></i> Orders</Link>
-                    </li>
-
-                    <li>
-                        <Link to="/admin/users"><i className="fa fa-users"></i> Users</Link>
-                    </li>
-
-                    <li>
-                        <Link to="/admin/reviews"><i className="fa fa-star"></i> Reviews</Link>
-                    </li>
-
-                </ul>
+        <div className="admin-nav-shell">
+            <nav className="admin-nav" aria-label="Admin navigation">
+                <NavLink to="/dashboard" end className={({ isActive }) => `admin-nav-link${isActive ? ' active' : ''}`}>
+                    <i className="fa fa-tachometer" aria-hidden="true"></i>
+                    Dashboard
+                </NavLink>
+                <NavLink
+                    to="/admin/products"
+                    className={({ isActive }) => `admin-nav-link${isActive || pathname.startsWith('/admin/product/') ? ' active' : ''}`}
+                >
+                    <i className="fa fa-product-hunt" aria-hidden="true"></i>
+                    Products
+                </NavLink>
+                <NavLink to="/admin/orders" className={({ isActive }) => `admin-nav-link${isActive ? ' active' : ''}`}>
+                    <i className="fa fa-shopping-basket" aria-hidden="true"></i>
+                    Orders
+                </NavLink>
+                <NavLink to="/admin/users" className={({ isActive }) => `admin-nav-link${isActive ? ' active' : ''}`}>
+                    <i className="fa fa-users" aria-hidden="true"></i>
+                    Users
+                </NavLink>
+                <NavLink to="/admin/reviews" className={({ isActive }) => `admin-nav-link${isActive ? ' active' : ''}`}>
+                    <i className="fa fa-star" aria-hidden="true"></i>
+                    Reviews
+                </NavLink>
             </nav>
         </div>
     )

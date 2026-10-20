@@ -10,8 +10,8 @@ const productSchema = new mongoose.Schema({
     price: {
         type: Number,
         required: [true, 'Please enter product price'],
-        maxLength: [5, 'Product name cannot exceed 5 characters'],
-        default: 0.0
+        min: [0, 'Product price cannot be negative'],
+        default: 0
     },
     description: {
         type: String,
@@ -39,6 +39,11 @@ const productSchema = new mongoose.Schema({
         required: [true, 'Please select category for this product'],
         enum: {
             values: [
+                'Sketchbooks',
+                'Calligraphy Pens',
+                'Brush Pens',
+                'Watercolor Sets',
+                'Inks & Refills',
                 'Electronics',
                 'Cameras',
                 'Laptops',
@@ -62,7 +67,11 @@ const productSchema = new mongoose.Schema({
     stock: {
         type: Number,
         required: [true, 'Please enter product stock'],
-        maxLength: [5, 'Product name cannot exceed 5 characters'],
+        min: [0, 'Product stock cannot be negative'],
+        validate: {
+            validator: Number.isInteger,
+            message: 'Product stock must be a whole number'
+        },
         default: 0
     },
     numOfReviews: {
@@ -87,6 +96,10 @@ const productSchema = new mongoose.Schema({
             comment: {
                 type: String,
                 required: true
+            },
+            verifiedPurchase: {
+                type: Boolean,
+                default: false
             }
         }
     ],

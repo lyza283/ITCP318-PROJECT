@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom'
 
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
-import Sidebar from './SideBar'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { DataGrid, } from '@mui/x-data-grid'
@@ -63,41 +62,36 @@ const OrdersList = () => {
         {
             field: 'numofItems',
             headerName: 'Number of Items',
-
-            width: 130,
-            align: 'right',
-            headerAlign: 'right'
+            flex: 1,
+            minWidth: 170
         },
         {
             field: 'amount',
             headerName: 'Amount',
-            width: 120,
-            align: 'right',
-            headerAlign: 'right'
+            flex: 1,
+            minWidth: 170
         },
         {
             field: 'status',
             headerName: 'Status',
-            width: 120,
-            align: 'right',
-            headerAlign: 'right'
+            flex: 1,
+            minWidth: 170
         },
 
         {
             field: 'actions',
             headerName: 'Actions',
-            width: 120,
+            flex: 1,
+            minWidth: 170,
             sortable: false,
             filterable: false,
             renderCell: (params) => (
-
                 <>
-                    {console.log(params)}
-                    <Link to={`/admin/order/${params.id}`} className="btn btn-primary py-1 px-2">
-                        <i className="fa fa-eye"></i>
+                    <Link to={`/admin/order/${params.id}`} className="btn btn-primary py-1 px-2" aria-label={`View order ${params.id}`}>
+                        <i className="fa fa-eye" aria-hidden="true"></i>
                     </Link>
-                    <button className="btn btn-danger py-1 px-2 ml-2" onClick={() => deleteOrderHandler(params.id)}>
-                        <i className="fa fa-trash"></i>
+                    <button type="button" className="btn btn-danger py-1 px-2 ml-2" onClick={() => deleteOrderHandler(params.id)} aria-label={`Delete order ${params.id}`}>
+                        <i className="fa fa-trash" aria-hidden="true"></i>
                     </button>
                 </>
             )
@@ -106,37 +100,28 @@ const OrdersList = () => {
     const rows = allOrders.map(order => ({
         id: order._id,
         numofItems: order.orderItems.length,
-        amount: `$${order.totalPrice}`,
+        amount: `₱${Number(order.totalPrice).toFixed(2)}`,
         status: order.orderStatus,
     }));
 
     return (
         <>
             <MetaData title={'All Orders'} />
-            <div className="row">
-                <div className="col-12 col-md-2">
-                    <Sidebar />
-                </div>
-                <div className="col-12 col-md-10">
-                    <>
-                        <h1 className="my-5">All Orders</h1>
-                        {loading ? <Loader /> : (
-                            <div style={{ width: '100%' }}>
-                                <DataGrid
-                                    rows={rows}
-                                    columns={columns}
-
-                                    pageSize={5}
-                                    rowsPerPageOptions={[5, 10, 25]}
-                                    disableSelectionOnClick
-                                    getRowId={(row) => row.id}
-                                    showToolbar
-                                />
-                            </div>
-                        )}
-                    </>
-                </div>
-            </div>
+            <main className="admin-page-content">
+                <h1 className="admin-page-title">All Orders</h1>
+                {loading ? <Loader /> : (
+                    <div className="admin-data-grid">
+                        <DataGrid
+                            rows={rows}
+                            columns={columns}
+                            pageSizeOptions={[5, 10, 25]}
+                            disableSelectionOnClick
+                            getRowId={(row) => row.id}
+                            showToolbar
+                        />
+                    </div>
+                )}
+            </main>
         </>
     )
 }

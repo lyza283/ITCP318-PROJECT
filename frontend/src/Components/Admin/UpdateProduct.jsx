@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import MetaData from '../Layout/MetaData'
-import Sidebar from './SideBar'
 
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css'
 import adminApi from './adminApi'
+import { productSchema } from '../../validation/schemas'
+import { productCategories } from '../../constants/productCategories'
 
 
 const UpdateProduct = () => {
@@ -20,20 +21,6 @@ const UpdateProduct = () => {
     const [imagesPreview, setImagesPreview] = useState([])
     const [loading, setLoading] = useState(true)
 
-    const categories = [
-        'Electronics',
-        'Cameras',
-        'Laptops',
-        'Accessories',
-        'Headphones',
-        'Food',
-        "Books",
-        'Clothes/Shoes',
-        'Beauty/Health',
-        'Sports',
-        'Outdoor',
-        'Home'
-    ]
     const { id } = useParams();
     const navigate = useNavigate();
 
@@ -73,8 +60,23 @@ const UpdateProduct = () => {
         }
     }, [id])
 
-    const submitHandler = (e) => {
+    const submitHandler = async (e) => {
         e.preventDefault();
+        try {
+            await productSchema.validate({
+                name,
+                price,
+                description,
+                category,
+                stock,
+                seller,
+                imageCount: oldImages.length + images.length
+            }, { abortEarly: false })
+        } catch (validationError) {
+            errMsg(validationError.errors[0])
+            return
+        }
+
         const formData = new FormData();
         formData.set('name', name);
         formData.set('price', price);
@@ -82,6 +84,7 @@ const UpdateProduct = () => {
         formData.set('category', category);
         formData.set('stock', stock);
         formData.set('seller', seller);
+        formData.set('retainedImages', JSON.stringify(oldImages.map(image => image.public_id)));
         images.forEach(image => {
             formData.append('images', image)
         })
@@ -102,7 +105,6 @@ const UpdateProduct = () => {
         const files = Array.from(e.target.files)
         setImagesPreview([]);
         setImages(files)
-        setOldImages([])
         files.forEach(file => {
             const reader = new FileReader();
             reader.onload = () => {
@@ -116,15 +118,11 @@ const UpdateProduct = () => {
     return (
         <>
             <MetaData title={'Update Product'} />
-            <div className="row">
-                <div className="col-12 col-md-2">
-                    <Sidebar />
-                </div>
-                <div className="col-12 col-md-10">
-                    <>
-                        <div className="wrapper my-5">
-                            <form className="shadow-lg" onSubmit={submitHandler} encType='multipart/form-data'>
+            <main className="admin-page-content">
+                <div className="wrapper my-5 product-editor-wrapper">
+                    <form className="shadow-lg product-editor-form" onSubmit={submitHandler} encType='multipart/form-data'>
                                 <h1 className="mb-4">Update Product</h1>
+                                <p className="product-editor-subtitle">Review the product details and manage its images.</p>
                                 <div className="form-group">
                                     <label htmlFor="name_field">Name</label>
                                     <input
@@ -145,14 +143,14 @@ const UpdateProduct = () => {
                                         onChange={(e) => setPrice(e.target.value)}
                                     />
                                 </div>
-                                <div className="form-group">
+                                <div className="form-group product-editor-description">
                                     <label htmlFor="description_field">Description</label>
-                                    <textarea className="form-control" id="description_field" rows="8" value={description} onChange={(e) => setDescription(e.target.value)}></textarea>
+                                    <textarea className="form-control" id="description_field" rows="5" value={description} onChange={(e) => setDescription(e.target.value)}></textarea>
                                 </div>
                                 <div className="form-group">
                                     <label htmlFor="category_field">Category</label>
                                     <select className="form-control" id="category_field" value={category} onChange={(e) => setCategory(e.target.value)}>
-                                        {categories.map(category => (
+                                        {productCategories.map(category => (
                                             <option key={category} value={category} >{category}</option>
                                         ))}
                                     </select>
@@ -177,7 +175,7 @@ const UpdateProduct = () => {
                                         onChange={(e) => setSeller(e.target.value)}
                                     />
                                 </div>
-                                <div className='form-group'>
+                                <div className='form-group product-editor-images'>
                                     <label>Images</label>
                                     <div className='custom-file'>
                                         <input
@@ -187,13 +185,24 @@ const UpdateProduct = () => {
                                             id='customFile'
                                             onChange={onChange}
                                             multiple
+                                            accept="image/jpeg,image/png,image/webp"
                                         />
                                         <label className='custom-file-label' htmlFor='customFile'>
-                                            Choose Images
+                                            Add Images (up to 10)
                                         </label>
                                     </div>
                                     {oldImages && oldImages.map(img => (
-                                        <img key={img} src={img.url} alt={img.url} className="mt-3 mr-2" width="55" height="52" />
+                                        <span className="product-image-preview" key={img.public_id}>
+                                            <img src={img.url} alt="Current product" className="mt-3 mr-2" width="72" height="68" />
+                                            <button
+                                                type="button"
+                                                className="product-image-remove"
+                                                aria-label="Remove current image"
+                                                onClick={() => setOldImages(current => current.filter(image => image.public_id !== img.public_id))}
+                                            >
+                                                &times;
+                                            </button>
+                                        </span>
                                     ))}
                                     {imagesPreview.map(img => (
                                         <img src={img} key={img} alt="Images Preview" className="mt-3 mr-2" width="55" height="52" />
@@ -207,11 +216,9 @@ const UpdateProduct = () => {
                                 >
                                     UPDATE
                                 </button>
-                            </form>
-                        </div>
-                    </>
+                    </form>
                 </div>
-            </div>
+            </main>
         </>
     )
 }

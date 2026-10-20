@@ -1,276 +1,189 @@
-import React, { useState, useEffect } from 'react'
-import { useParams, } from 'react-router-dom'
-import MetaData from '../Layout/MetaData'
-import { Carousel } from 'react-bootstrap'
-
-import 'react-toastify/dist/ReactToastify.css';
+import { useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import { Carousel, Modal } from 'react-bootstrap'
 import axios from 'axios'
-import ListReviews from '../Review/ListReviews';
-
-import { getUser, getToken, successMsg, errMsg } from '../Utils/helpers'
+import { toast } from 'react-toastify'
 import { useDispatch, useSelector } from 'react-redux'
-import { getProductDetails, clearErrors, } from '../../actions/productActions'
+
+import MetaData from '../Layout/MetaData'
+import Loader from '../Layout/Loader'
+import ListReviews from '../Review/ListReviews'
+import { getProductDetails } from '../../actions/productActions'
 import { addItemToCart } from '../../actions/cartActions'
+
 const ProductDetails = () => {
-    // const [product, setProduct] = useState({})
-    const { loading, error, product } = useSelector(state => state.productDetails);
+    const { id } = useParams()
+    const dispatch = useDispatch()
+    const { loading, error, product } = useSelector(state => state.productDetails)
+    const { user } = useSelector(state => state.auth)
     const [quantity, setQuantity] = useState(1)
-    const [user, setUser] = useState(getUser())
     const [rating, setRating] = useState(0)
     const [comment, setComment] = useState('')
-    const [errorReview, setErrorReview] = useState('');
-    const [success, setSuccess] = useState('')
-    let { id } = useParams()
-    const dispatch = useDispatch()
-    // const productDetails = async (id) => {
-    //     let link = `http://localhost:4001/api/v1/product/${id}`
-    //     try {
-    //         let res = await axios.get(link)
-    //         setProduct(res.data.product)
-    //     } catch (err) {
-    //         console.log(err)
-    //         // setError('Product not found')
-    //     }
-    // }
+    const [showReview, setShowReview] = useState(false)
+    const [submittingReview, setSubmittingReview] = useState(false)
 
-    const increaseQty = () => {
-        const count = document.querySelector('.count')
-        if (count.valueAsNumber >= product.stock) return;
-        const qty = count.valueAsNumber + 1;
-        setQuantity(qty)
-    }
-
-    const decreaseQty = () => {
-        const count = document.querySelector('.count')
-        if (count.valueAsNumber <= 1) return;
-        const qty = count.valueAsNumber - 1;
-        setQuantity(qty)
-    }
-
-    const addToCart = async () => {
-        await dispatch(addItemToCart(id, quantity));
-
-    }
-
-    function setUserRatings() {
-        const stars = document.querySelectorAll('.star');
-        stars.forEach((star, index) => {
-            star.starValue = index + 1;
-            ['click', 'mouseover', 'mouseout'].forEach(function (e) {
-                star.addEventListener(e, showRatings);
-            })
-        })
-        function showRatings(e) {
-            stars.forEach((star, index) => {
-                if (e.type === 'click') {
-                    if (index < this.starValue) {
-                        star.classList.add('orange');
-                        setRating(this.starValue)
-                    } else {
-                        star.classList.remove('orange')
-                    }
-                }
-                if (e.type === 'mouseover') {
-                    if (index < this.starValue) {
-                        star.classList.add('yellow');
-                    } else {
-                        star.classList.remove('yellow')
-                    }
-                }
-                if (e.type === 'mouseout') {
-                    star.classList.remove('yellow')
-                }
-            })
-        }
-    }
-
-    const newReview = async (reviewData) => {
-        try {
-            const config = {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${getToken()}`
-                }
-            }
-
-            const { data } = await axios.put(`${import.meta.env.VITE_API}/review`, reviewData, config)
-            setSuccess(data.success)
-
-        } catch (error) {
-            setErrorReview(error.response.data.message)
-        }
-    }
-
-    const reviewHandler = () => {
-        const formData = new FormData();
-        formData.set('rating', rating);
-        formData.set('comment', comment);
-        formData.set('productId', id);
-        newReview(formData)
-
-    }
+    const existingReview = product.reviews?.find(
+        review => String(review.user?._id || review.user) === String(user?._id)
+    )
 
     useEffect(() => {
         dispatch(getProductDetails(id))
+    }, [dispatch, id])
 
-    }, [id,]);
+    const changeQuantity = (difference) => {
+        setQuantity(current => Math.min(product.stock, Math.max(1, current + difference)))
+    }
 
-    // useEffect(() => {
-    //     localStorage.setItem('cartItems', JSON.stringify(cartItems));
-    // }, [cartItems]);
+    const openReviewForm = () => {
+        setRating(existingReview?.rating || 0)
+        setComment(existingReview?.comment || '')
+        setShowReview(true)
+    }
+
+    const submitReview = async (event) => {
+        event.preventDefault()
+        if (rating < 1 || rating > 5) {
+            toast.error('Choose a rating from 1 to 5 stars.')
+            return
+        }
+        if (comment.trim().length < 2) {
+            toast.error('Write a review with at least 2 characters.')
+            return
+        }
+
+        setSubmittingReview(true)
+        try {
+            await axios.put(`${import.meta.env.VITE_API}/review`, {
+                rating,
+                comment: comment.trim(),
+                productId: id
+            }, { withCredentials: true })
+            toast.success(existingReview ? 'Your review has been updated.' : 'Your review has been submitted.')
+            setShowReview(false)
+            await dispatch(getProductDetails(id))
+        } catch (requestError) {
+            toast.error(requestError.response?.data?.message || requestError.message || 'Unable to submit your review.')
+        } finally {
+            setSubmittingReview(false)
+        }
+    }
+
+    if (loading) return <Loader />
+    if (error) return <div className="container alert alert-danger mt-5" role="alert">{error}</div>
 
     return (
         <>
-            <MetaData title={product.name} />
-            <div className="row d-flex justify-content-around">
-                <div className="col-12 col-lg-5 img-fluid" id="product_image">
-                    <Carousel pause='hover'>
-                        {product.images && product.images.map(image => (
-                            <Carousel.Item key={image.public_id}>
-                                <img className="d-block w-100" src={image.url} alt={product.title} />
-                            </Carousel.Item>
-                        ))}
-                    </Carousel>
+            <MetaData title={product.name || 'Product Details'} />
+            <main className="container product-detail-page">
+                <div className="row justify-content-center">
+                    <div className="col-12 col-lg-5 product-detail-gallery" id="product_image">
+                        <Carousel pause="hover" indicators={product.images?.length > 1}>
+                            {product.images?.map(image => (
+                                <Carousel.Item key={image.public_id}>
+                                    <img src={image.url} alt={product.name} />
+                                </Carousel.Item>
+                            ))}
+                        </Carousel>
+                    </div>
+
+                    <div className="col-12 col-lg-5 mt-4 mt-lg-0 product-detail-information">
+                        <p className="admin-eyebrow">{product.category}</p>
+                        <h1>{product.name}</h1>
+                        <p id="product_id">Product # {product._id}</p>
+                        <div className="d-flex align-items-center">
+                            <div className="rating-outer">
+                                <div className="rating-inner" style={{ width: `${(product.ratings / 5) * 100}%` }}></div>
+                            </div>
+                            <span id="no_of_reviews">({product.numOfReviews || 0} reviews)</span>
+                        </div>
+                        <hr />
+                        <p id="product_price">₱{Number(product.price).toFixed(2)}</p>
+                        <div className="product-purchase-controls">
+                            <div className="stockCounter">
+                                <button type="button" className="btn btn-light" onClick={() => changeQuantity(-1)} disabled={quantity <= 1} aria-label="Decrease quantity">−</button>
+                                <input type="number" className="form-control count" value={quantity} readOnly aria-label="Quantity" />
+                                <button type="button" className="btn btn-light" onClick={() => changeQuantity(1)} disabled={quantity >= product.stock} aria-label="Increase quantity">+</button>
+                            </div>
+                            <button
+                                type="button"
+                                id="cart_btn"
+                                className="btn btn-primary"
+                                disabled={product.stock === 0}
+                                onClick={() => dispatch(addItemToCart(id, quantity))}
+                            >
+                                Add to cart
+                            </button>
+                        </div>
+                        <p className="product-stock-status">
+                            Availability: <strong className={product.stock > 0 ? 'greenColor' : 'redColor'}>
+                                {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
+                            </strong>
+                        </p>
+                        <hr />
+                        <h2>Description</h2>
+                        <p>{product.description}</p>
+                        <p id="product_seller">Sold by: <strong>{product.seller}</strong></p>
+
+                        {user?._id ? (
+                            <button type="button" className="btn btn-primary mt-3" onClick={openReviewForm}>
+                                {existingReview ? 'Edit your review' : 'Write a review'}
+                            </button>
+                        ) : (
+                            <div className="alert alert-info mt-3" role="alert">
+                                Log in to write a review. Only customers with a completed purchase can review this product.
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                <div className="col-12 col-lg-5 mt-5">
-                    <h3>{product.name}</h3>
-                    <p id="product_id">Product # {product._id}</p>
-
-                    <hr />
-
-                    <div className="rating-outer">
-                        <div className="rating-inner" style={{ width: `${(product.ratings / 5) * 100}%` }}></div>
-                    </div>
-                    <span id="no_of_reviews">({product.numOfReviews} Reviews)</span>
-
-                    <hr />
-
-                    <p id="product_price">${product.price}</p>
-                    <div className="stockCounter d-inline">
-                        {/* <span className="btn btn-danger minus" >-</span>
-
-                        <input type="number" className="form-control count d-inline" readOnly />
-
-                        <span className="btn btn-primary plus" >+</span> */}
-                        <span className="btn btn-danger minus" onClick={decreaseQty}>-</span>
-
-                        <input type="number" className="form-control count d-inline" value={quantity} readOnly />
-
-                        <span className="btn btn-primary plus" onClick={increaseQty}>+</span>
-
-                    </div>
-
-
-                    <button type="button" id="cart_btn" className="btn btn-primary d-inline ml-4" disabled={product.stock === 0} onClick={addToCart} >Add to Cart</button>
-                    <hr />
-
-                    <p>Status: <span id="stock_status" className={product.stock > 0 ? 'greenColor' : 'redColor'} >{product.stock > 0 ? 'In Stock' : 'Out of Stock'}</span></p>
-
-                    <hr />
-
-                    <h4 className="mt-2">Description:</h4>
-                    <p>{product.description}</p>
-                    <hr />
-                    <p id="product_seller mb-3">Sold by: <strong>{product.seller}</strong></p>
-                    {/* <div className="alert alert-danger mt-5" type='alert'>Login to post your review.</div>
-                    <button id="review_btn" type="button" className="btn btn-primary mt-4" data-toggle="modal" data-target="#ratingModal"  >
-                        Submit Your Review
-                    </button> */}
-                    {user ? <button id="review_btn" type="button" className="btn btn-primary mt-4" data-toggle="modal" data-target="#ratingModal" onClick={setUserRatings} >
-                        Submit Your Review
-                    </button> :
-                        <div className="alert alert-danger mt-5" type='alert'>Login to post your review.</div>}
-
-                    {/* <div className="row mt-2 mb-5">
-                        <div className="rating w-50">
-
-                            <div className="modal fade" id="ratingModal" tabIndex="-1" role="dialog" aria-labelledby="ratingModalLabel" aria-hidden="true">
-                                <div className="modal-dialog" role="document">
-                                    <div className="modal-content">
-                                        <div className="modal-header">
-                                            <h5 className="modal-title" id="ratingModalLabel">Submit Review</h5>
-                                            <button type="button" className="close" data-dismiss="modal" aria-label="Close">
-                                                <span aria-hidden="true">&times;</span>
-                                            </button>
-                                        </div>
-                                        <div className="modal-body">
-
-                                            <ul className="stars" >
-                                                <li className="star"><i className="fa fa-star"></i></li>
-                                                <li className="star"><i className="fa fa-star"></i></li>
-                                                <li className="star"><i className="fa fa-star"></i></li>
-                                                <li className="star"><i className="fa fa-star"></i></li>
-                                                <li className="star"><i className="fa fa-star"></i></li>
-                                            </ul>
-
-                                            <textarea
-                                                name="review"
-                                                id="review" className="form-control mt-3"
-
-
-                                            >
-                                            </textarea>
-
-
-                                            <button className="btn my-3 float-right review-btn px-4 text-white" data-dismiss="modal" aria-label="Close" >Submit</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                        </div>
-                    </div> */}
-                    <div className="row mt-2 mb-5">
-                        <div className="rating w-50">
-
-                            <div className="modal fade" id="ratingModal" tabIndex="-1" role="dialog" aria-labelledby="ratingModalLabel" aria-hidden="true">
-                                <div className="modal-dialog" role="document">
-                                    <div className="modal-content">
-                                        <div className="modal-header">
-                                            <h5 className="modal-title" id="ratingModalLabel">Submit Review</h5>
-                                            <button type="button" className="close" data-dismiss="modal" aria-label="Close">
-                                                <span aria-hidden="true">&times;</span>
-                                            </button>
-                                        </div>
-                                        <div className="modal-body">
-
-                                            <ul className="stars" >
-                                                <li className="star"><i className="fa fa-star"></i></li>
-                                                <li className="star"><i className="fa fa-star"></i></li>
-                                                <li className="star"><i className="fa fa-star"></i></li>
-                                                <li className="star"><i className="fa fa-star"></i></li>
-                                                <li className="star"><i className="fa fa-star"></i></li>
-                                            </ul>
-
-                                            <textarea
-                                                name="review"
-                                                id="review" className="form-control mt-3"
-                                                value={comment}
-                                                onChange={(e) => setComment(e.target.value)}
-
-                                            >
-                                            </textarea>
-
-
-                                            <button className="btn my-3 float-right review-btn px-4 text-white" data-dismiss="modal" aria-label="Close" onClick={reviewHandler} >Submit</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-                    {product.reviews && product.reviews.length > 0 && (
-
+                {product.reviews?.length > 0 && (
+                    <section className="product-reviews-section">
                         <ListReviews reviews={product.reviews} />
+                    </section>
+                )}
+            </main>
 
-                    )}
-                </div>
-
-            </div>
-
-
+            <Modal show={showReview} onHide={() => setShowReview(false)} centered>
+                <Modal.Header closeButton>
+                    <Modal.Title>{existingReview ? 'Edit review' : 'Write a review'}</Modal.Title>
+                </Modal.Header>
+                <form onSubmit={submitReview}>
+                    <Modal.Body>
+                        <div className="review-rating-picker" role="group" aria-label="Select a rating">
+                            {[1, 2, 3, 4, 5].map(star => (
+                                <button
+                                    key={star}
+                                    type="button"
+                                    className={star <= rating ? 'selected' : ''}
+                                    aria-label={`${star} star${star === 1 ? '' : 's'}`}
+                                    aria-pressed={rating === star}
+                                    onClick={() => setRating(star)}
+                                >
+                                    <i className="fa fa-star" aria-hidden="true"></i>
+                                </button>
+                            ))}
+                        </div>
+                        <label className="sr-only" htmlFor="review-comment">Your review</label>
+                        <textarea
+                            id="review-comment"
+                            className="form-control mt-3"
+                            value={comment}
+                            onChange={event => setComment(event.target.value)}
+                            maxLength={1000}
+                            minLength={2}
+                            required
+                            placeholder="Share your experience"
+                        />
+                        <p className="review-eligibility-note">Reviews are limited to customers with a completed purchase.</p>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <button type="button" className="btn btn-light" onClick={() => setShowReview(false)}>Cancel</button>
+                        <button type="submit" className="btn btn-primary" disabled={submittingReview}>
+                            {submittingReview ? 'Saving...' : existingReview ? 'Update review' : 'Submit review'}
+                        </button>
+                    </Modal.Footer>
+                </form>
+            </Modal>
         </>
     )
 }

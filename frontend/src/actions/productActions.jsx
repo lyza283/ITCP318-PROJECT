@@ -10,19 +10,20 @@ import {
     CLEAR_ERRORS
 } from '../constants/productConstants';
 
-export const getProducts = (currentPage = 1, keyword = '', price, category = '') => async (dispatch) => {
+export const getProducts = (currentPage = 1, keyword = '', filters = {}) => async (dispatch) => {
     try {
         dispatch({
             type: ALL_PRODUCTS_REQUEST
         })
 
-        let link = `${import.meta.env.VITE_API}/products?page=${currentPage}&keyword=${keyword}&price[lte]=${price[1]}&price[gte]=${price[0]}`
+        const params = new URLSearchParams({ page: String(currentPage), keyword })
+        if (filters.minPrice !== '') params.set('price[gte]', String(filters.minPrice))
+        if (filters.maxPrice !== '') params.set('price[lte]', String(filters.maxPrice))
+        if (filters.category) params.set('category', filters.category)
+        if (filters.minRating) params.set('rating[gte]', String(filters.minRating))
+        if (filters.hasReviews !== '') params.set('hasReviews', String(filters.hasReviews))
 
-        if (category) {
-            link = `${import.meta.env.VITE_API}/products?keyword=${keyword}&page=${currentPage}&price[lte]=${price[1]}&price[gte]=${price[0]}&category=${category}`
-        }
-        const { data } = await axios.get(link)
-        console.log(data)
+        const { data } = await axios.get(`${import.meta.env.VITE_API}/products?${params.toString()}`)
         dispatch({
             type: ALL_PRODUCTS_SUCCESS,
             payload: data
@@ -31,7 +32,7 @@ export const getProducts = (currentPage = 1, keyword = '', price, category = '')
     } catch (error) {
         dispatch({
             type: ALL_PRODUCTS_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || error.message || 'Unable to load products.'
         })
     }
 }
@@ -47,7 +48,7 @@ export const getProductDetails = (id) => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: PRODUCT_DETAILS_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || error.message || 'Unable to load product.'
         })
     }
 }

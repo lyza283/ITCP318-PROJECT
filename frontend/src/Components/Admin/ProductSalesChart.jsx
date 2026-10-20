@@ -3,30 +3,20 @@ import adminApi from './adminApi'
 
 import { PieChart, Pie, Legend, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-export default function ProductSalesChart() {
+export default function ProductSalesChart({ startDate, endDate }) {
     const [sales, setSales] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const pieColors = [
-        "#FF6633",
-        "#FFB399",
-        "#FF33FF",
-        "#FFFF99",
-        "#00B3E6",
-        "#E6B333",
-        "#3366E6",
-        "#999966",
-        "#809980",
-        "#E6FF80",
-        "#1AFF33",
-        "#999933",
-        "#FF3380",
-        "#CCCC00",
-        "#66E64D",
-        "#4D80CC",
-        "#FF4D4D",
-        "#99E6E6",
-        "#6666FF"
+        "#f2c94c",
+        "#dfa92b",
+        "#c58b35",
+        "#a87521",
+        "#96734f",
+        "#806044",
+        "#65452d",
+        "#50331f",
+        "#e9d7a5"
     ]
     // console.log(data)
 
@@ -44,7 +34,7 @@ export default function ProductSalesChart() {
     };
     useEffect(() => {
         let active = true
-        adminApi.get('/admin/product-sales')
+        adminApi.get('/admin/product-sales', { params: { startDate, endDate } })
             .then(({ data }) => {
                 if (active) setSales(data.totalPercentage)
             })
@@ -58,14 +48,15 @@ export default function ProductSalesChart() {
         return () => {
             active = false
         }
-    }, [])
+    }, [startDate, endDate])
 
     if (loading) return <div className="text-center">Loading product sales...</div>
     if (error) return <div className="alert alert-danger">{error}</div>
+    if (!sales.length) return <div className="chart-empty-state">No completed product sales in this date range.</div>
 
     return (
-        <ResponsiveContainer width="90%" height={1000}>
-            <PieChart width={1000} height={1000}>
+        <ResponsiveContainer width="100%" height={340}>
+            <PieChart>
                 {/* <Pie data={data} dataKey="percent" nameKey="name" cx="50%" cy="50%" outerRadius={50} fill="#8884d8" /> */}
                 <Pie
                     dataKey="percent"
@@ -74,8 +65,8 @@ export default function ProductSalesChart() {
                     data={sales}
                     cx="50%"
                     cy="50%"
-                    outerRadius={300}
-                    fill="#8884d8"
+                    outerRadius={110}
+                    fill="#a87521"
                     label={renderCustomizedLabel}
                     labelLine={false}
                 // label

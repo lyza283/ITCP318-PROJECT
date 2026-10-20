@@ -1,132 +1,70 @@
-import React, { Fragment, useEffect, useState } from 'react'
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
+import { useDispatch, useSelector } from 'react-redux'
+
 import MetaData from '../Layout/MetaData'
 import CheckoutSteps from './CheckoutSteps'
-import axios from 'axios';
-import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-// import { getToken } from '../Utils/helpers';
-import { useDispatch, useSelector } from 'react-redux'
-import { createOrder, clearErrors } from '../../actions/orderActions'
-import { clearCart } from '../../actions/cartActions';
-
-
+import { clearErrors, createOrder } from '../../actions/orderActions'
+import { clearCart } from '../../actions/cartActions'
 
 const Payment = () => {
-    // const [loading, setLoading] = useState(true)
-    const dispatch = useDispatch();
+    const dispatch = useDispatch()
+    const navigate = useNavigate()
     const { cartItems, shippingInfo } = useSelector(state => state.cart)
-    const { error, loading } = useSelector(state => state.newOrder)
-    let navigate = useNavigate();
-    // useEffect(() => {
-    // }, [])
+    const { error } = useSelector(state => state.newOrder)
+    const [placingOrder, setPlacingOrder] = useState(false)
+
     useEffect(() => {
         if (error) {
-            console.log(error)
+            toast.error(error)
             dispatch(clearErrors())
         }
-
     }, [dispatch, error])
 
-    const order = {
-        orderItems: cartItems,
-        shippingInfo
-    }
-
-    const orderInfo = JSON.parse(sessionStorage.getItem('orderInfo'));
-    if (orderInfo) {
-        order.itemsPrice = orderInfo.itemsPrice
-        order.shippingPrice = orderInfo.shippingPrice
-        order.taxPrice = orderInfo.taxPrice
-        order.totalPrice = orderInfo.totalPrice
-    }
-
-    // const createOrder = async (order) => {
-    //     console.log(order)
-    //     try {
-    //         const config = {
-    //             headers: {
-    //                 'Content-Type': 'application/json',
-    //                 'Authorization': `Bearer ${getToken()}`
-    //             }
-    //         }
-    //         const { data } = await axios.post(`${import.meta.env.VITE_API}/order/new`, order, config)
-    //         // setIsUpdated(data.success)
-    //         setLoading(false)
-    //         toast.success('order created', {
-    //             position: toast.POSITION.BOTTOM_RIGHT
-    //         });
-
-    //         // sessionStorage.removeItem('orderInfo')
-    //         // navigate('/success')
-
-    //     } catch (error) {
-    //         toast.error(error.response.data.message, {
-    //             position: toast.POSITION.BOTTOM_RIGHT
-    //         });
-    //     }
-    // }
-
-    const submitHandler = async (e) => {
-        e.preventDefault();
-        document.querySelector('#pay_btn').disabled = true;
-        order.paymentInfo = {
-            id: 'pi_1DpdYh2eZvKYlo2CYIynhU32',
-            status: 'succeeded'
+    const submitHandler = async (event) => {
+        event.preventDefault()
+        if (!cartItems.length) {
+            toast.error('Your cart is empty.')
+            navigate('/cart')
+            return
         }
-        dispatch(createOrder(order))
-        navigate('/success')
+
+        setPlacingOrder(true)
+        const order = await dispatch(createOrder({
+            orderItems: cartItems,
+            shippingInfo
+        }))
+        setPlacingOrder(false)
+
+        if (order?._id) {
+            await dispatch(clearCart())
+            sessionStorage.removeItem('orderInfo')
+            navigate('/success', { state: { orderId: order._id } })
+        }
     }
 
     return (
         <>
-            <MetaData title={'Payment'} />
+            <MetaData title="Place Order" />
             <CheckoutSteps shipping confirmOrder payment />
             <div className="row wrapper">
                 <div className="col-10 col-lg-5">
                     <form className="shadow-lg" onSubmit={submitHandler}>
-                        <h1 className="mb-4">Card Info</h1>
-                        <div className="form-group">
-                            <label htmlFor="card_num_field">Card Number</label>
-                            <input
-                                type="text"
-                                id="card_num_field"
-                                className="form-control"
-
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="card_exp_field">Card Expiry</label>
-                            <input
-                                type="text"
-                                id="card_exp_field"
-                                className="form-control"
-
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="card_cvc_field">Card CVC</label>
-                            <input
-                                type="text"
-                                id="card_cvc_field"
-                                className="form-control"
-
-                            />
-                        </div>
+                        <h1 className="mb-4">Place your order</h1>
+                        <p>Your order will be confirmed now and paid for using Cash on Delivery.</p>
+                        <p>We will verify the final totals and stock before creating your order.</p>
                         <button
                             id="pay_btn"
                             type="submit"
                             className="btn btn-block py-3"
+                            disabled={placingOrder}
                         >
-                            Pay {` - ${orderInfo && orderInfo.totalPrice}`}
+                            {placingOrder ? 'PLACING ORDER...' : 'PLACE ORDER (CASH ON DELIVERY)'}
                         </button>
-
                     </form>
                 </div>
             </div>
-
         </>
     )
 }

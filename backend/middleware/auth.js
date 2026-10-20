@@ -10,8 +10,15 @@ exports.isAuthenticatedUser = async (req, res, next) => {
         return res.status(401).json({ message: 'Login first to access this resource' })
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET)
-    req.user = await User.findById(decoded.id);
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET)
+        req.user = await User.findById(decoded.id);
+        if (!req.user) {
+            return res.status(401).json({ message: 'The account for this session no longer exists.' })
+        }
+    } catch {
+        return res.status(401).json({ message: 'Your session is invalid or has expired. Please log in again.' })
+    }
 
     next()
 };

@@ -13,14 +13,14 @@ import {
 import adminApi from './adminApi'
 import Loader from '../Layout/Loader';
 
-const UserSalesChart = () => {
+const UserSalesChart = ({ startDate, endDate }) => {
     const [sales, setSales] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
-    const barColors = ["#FACC15", "#EAB308", "#1E293B"]
+    const barColors = ["#f2c94c", "#dfa92b", "#65452d", "#96734f"]
     useEffect(() => {
         let active = true
-        adminApi.get('/admin/customer-sales')
+        adminApi.get('/admin/customer-sales', { params: { startDate, endDate } })
             .then(({ data }) => {
                 if (active) setSales(data.customerSales)
             })
@@ -34,11 +34,11 @@ const UserSalesChart = () => {
         return () => {
             active = false
         }
-    }, [])
+    }, [startDate, endDate])
 
     return (
-        <ResponsiveContainer width="90%" height={600}>
-            {loading ? <Loader /> : error ? <div className="alert alert-danger">{error}</div> : (<BarChart
+        <ResponsiveContainer width="100%" height={340}>
+            {loading ? <Loader /> : error ? <div className="alert alert-danger">{error}</div> : !sales.length ? <div className="chart-empty-state">No completed customer sales in this date range.</div> : (<BarChart
                 data={sales}
             >
                 <CartesianGrid strokeDasharray="2 2" />
@@ -47,11 +47,11 @@ const UserSalesChart = () => {
                 <Tooltip />
                 <Legend />
 
-                <Bar dataKey="total" stroke="#000000"
-                    strokeWidth={5} >
+                <Bar dataKey="total" stroke="#402a1b"
+                    strokeWidth={2} >
                     {
                         sales.map((item, index) => (
-                            <Cell key={`cell-${index}`} fill={barColors[index % 20]} />
+                            <Cell key={`cell-${index}`} fill={barColors[index % barColors.length]} />
                         ))
                     }
                 </Bar>

@@ -1,4 +1,3 @@
-import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import MetaData from '../Layout/MetaData'
 import CheckoutSteps from './CheckoutSteps'
@@ -14,6 +13,7 @@ const ConfirmOrder = () => {
     const shippingPrice = itemsPrice > 200 ? 0 : 25
     const taxPrice = Number((0.05 * itemsPrice).toFixed(2))
     const totalPrice = (itemsPrice + shippingPrice + taxPrice).toFixed(2)
+    const itemCount = cartItems.reduce((total, item) => total + Number(item.quantity), 0)
 
     const processToPayment = () => {
         const data = {
@@ -31,62 +31,77 @@ const ConfirmOrder = () => {
         <>
             <MetaData title={'Confirm Order'} />
             <CheckoutSteps shipping confirmOrder />
-            <div className="row d-flex justify-content-between">
-                <div className="col-12 col-lg-8 mt-5 order-confirm">
-                    <h4 className="mb-3">Shipping Info</h4>
-                    {user && <p><b>Name:</b> {user && user.name}</p>}
-                    <p><b>Phone:</b> {shippingInfo.phoneNo}</p>
-                    <p className="mb-4"><b>Address:</b> {`${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postalCode}, ${shippingInfo.country}`}</p>
+            <main className="confirm-order-page">
+                <div className="confirm-order-content">
+                    <div className="confirm-order-main">
+                        <section className="confirm-shipping-card">
+                            <div className="confirm-section-heading">
+                                <div>
+                                    <p className="admin-eyebrow">DELIVERY DETAILS</p>
+                                    <h1>Shipping information</h1>
+                                </div>
+                                <i className="fa fa-map-marker" aria-hidden="true"></i>
+                            </div>
+                            <div className="confirm-shipping-details">
+                                {user && <div><span>Name</span><strong>{user.name}</strong></div>}
+                                <div><span>Phone</span><strong>{shippingInfo.phoneNo}</strong></div>
+                                <div className="confirm-address"><span>Address</span><strong>{`${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.postalCode}, ${shippingInfo.country}`}</strong></div>
+                            </div>
+                        </section>
 
-                    <hr />
-                    <h4 className="mt-4">Your Cart Items:</h4>
-
-                    {cartItems.map(item => (
-                        <>
-
-                            <div className="cart-item my-1" key={item.product}>
-                                <hr />
-                                <div className="row">
-                                    <div className="col-4 col-lg-2">
-                                        <img src={item.image} alt="Laptop" height="45" width="65" />
-                                    </div>
-
-                                    <div className="col-5 col-lg-6">
-                                        <Link to={`/product/${item.product}`}>{item.name}</Link>
-                                    </div>
-
-
-                                    <div className="col-4 col-lg-4 mt-4 mt-lg-0">
-                                        <p>{item.quantity} x ${item.price} = <b>${(item.quantity * item.price).toFixed(2)}</b></p>
-                                    </div>
-
+                        <section className="confirm-items-section">
+                            <div className="confirm-section-heading">
+                                <div>
+                                    <p className="admin-eyebrow">ORDER CONTENTS</p>
+                                    <h2>Your items <span>{itemCount}</span></h2>
                                 </div>
                             </div>
-                            <hr />
-                        </>
-                    ))}
-
-                </div>
-
-                <div className="col-12 col-lg-3 my-4">
-                    <div id="order_summary">
-                        <h4>Order Summary</h4>
-                        <hr />
-                        <p>Subtotal:  <span className="order-summary-values">${itemsPrice}</span></p>
-                        <p>Shipping: <span className="order-summary-values">${shippingPrice}</span></p>
-                        <p>Tax:  <span className="order-summary-values">${taxPrice}</span></p>
-
-                        <hr />
-
-                        <p>Total: <span className="order-summary-values">${totalPrice}</span></p>
-
-                        <hr />
-                        <button id="checkout_btn" className="btn btn-primary btn-block" onClick={processToPayment}>Proceed to Payment</button>
+                            <div className="confirm-items-list">
+                                {cartItems.map(item => (
+                                    <article className="confirm-item" key={item.product}>
+                                        <Link to={`/product/${item.product}`} className="confirm-item-image">
+                                            <img src={item.image} alt={item.name} />
+                                        </Link>
+                                        <div className="confirm-item-details">
+                                            <Link to={`/product/${item.product}`} className="confirm-item-name">{item.name}</Link>
+                                            <span>Quantity: {item.quantity}</span>
+                                        </div>
+                                        <div className="confirm-item-price">
+                                            <span>₱{Number(item.price).toFixed(2)} each</span>
+                                            <strong>₱{(Number(item.quantity) * Number(item.price)).toFixed(2)}</strong>
+                                        </div>
+                                    </article>
+                                ))}
+                            </div>
+                        </section>
                     </div>
+
+                    <aside id="order_summary" className="confirm-order-summary">
+                        <p className="admin-eyebrow">PAYMENT BREAKDOWN</p>
+                        <h2>Order summary</h2>
+                        <div className="confirm-summary-row">
+                            <span>Subtotal <small>({itemCount} items)</small></span>
+                            <strong>₱{itemsPrice.toFixed(2)}</strong>
+                        </div>
+                        <div className="confirm-summary-row">
+                            <span>Shipping</span>
+                            <strong>{shippingPrice === 0 ? 'Free' : `₱${shippingPrice.toFixed(2)}`}</strong>
+                        </div>
+                        <div className="confirm-summary-row">
+                            <span>Tax</span>
+                            <strong>₱{taxPrice.toFixed(2)}</strong>
+                        </div>
+                        <div className="confirm-summary-total">
+                            <span>Total</span>
+                            <strong>₱{totalPrice}</strong>
+                        </div>
+                        <button id="checkout_btn" className="btn btn-primary btn-block" onClick={processToPayment}>
+                            Continue to payment
+                        </button>
+                        <p className="confirm-summary-note">Review your delivery details and items before continuing.</p>
+                    </aside>
                 </div>
-
-
-            </div>
+            </main>
 
         </>
     )

@@ -3,6 +3,23 @@ const Order = require('../models/order')
 const cloudinary = require('cloudinary')
 const APIFeatures = require('../utils/apiFeatures');
 const fs = require('fs/promises');
+const mongoose = require('mongoose');
+const { Filter } = require('bad-words');
+const { parseDateRange, completedSalesPipeline } = require('../utils/salesAnalytics');
+
+const profanityFilter = new Filter();
+
+async function removeTemporaryImages(files = []) {
+    await Promise.all(files.map(async file => {
+        try {
+            await fs.unlink(file.path);
+        } catch (error) {
+            if (error.code !== 'ENOENT') {
+                console.error('Failed to remove temporary product image:', error.message);
+            }
+        }
+    }));
+}
 
 exports.newProduct = async (req, res, next) => {
     if (!req.files?.length) {
@@ -27,26 +44,28 @@ exports.newProduct = async (req, res, next) => {
             });
         }
     } catch (error) {
+        await Promise.all(imagesLinks.map(image =>
+            cloudinary.v2.uploader.destroy(image.public_id)
+        ).map(promise => promise.catch(cleanupError => {
+            console.error('Failed to roll back product image upload:', cleanupError.message);
+        })));
         console.error('Product image upload failed:', error.message);
         return res.status(502).json({
             success: false,
             message: 'Product image upload failed. Check Cloudinary configuration and try again.'
         });
     } finally {
-        await Promise.all(req.files.map(async image => {
-            try {
-                await fs.unlink(image.path);
-            } catch (error) {
-                if (error.code !== 'ENOENT') {
-                    console.error('Failed to remove temporary product image:', error.message);
-                }
-            }
-        }));
+        await removeTemporaryImages(req.files);
     }
 
     try {
         const product = await Product.create({
-            ...req.body,
+            name: req.body.name,
+            price: req.body.price,
+            description: req.body.description,
+            category: req.body.category,
+            stock: req.body.stock,
+            seller: req.body.seller,
             images: imagesLinks,
             user: req.user._id
         });
@@ -56,6 +75,11 @@ exports.newProduct = async (req, res, next) => {
             product
         });
     } catch (error) {
+        await Promise.all(imagesLinks.map(image =>
+            cloudinary.v2.uploader.destroy(image.public_id)
+        ).map(promise => promise.catch(cleanupError => {
+            console.error('Failed to clean up product image after create failure:', cleanupError.message);
+        })));
         if (error.name === 'ValidationError' || error.name === 'CastError') {
             return res.status(400).json({
                 success: false,
@@ -85,29 +109,30 @@ exports.getSingleProduct = async (req, res, next) => {
 }
 
 exports.getProducts = async (req, res) => {
+    try {
+        const resPerPage = 4;
+        const apiFeatures = new APIFeatures(Product.find(), req.query).search().filter()
+        apiFeatures.pagination(resPerPage);
 
-    const resPerPage = 4;
-    const productsCount = await Product.countDocuments();
+        const [products, filteredProductsCount, productsCount] = await Promise.all([
+            apiFeatures.query,
+            Product.countDocuments(apiFeatures.filters),
+            Product.countDocuments()
+        ]);
 
-    // const products = await Product.find()
-    const apiFeatures = new APIFeatures(Product.find(), req.query).search().filter()
-    // .filter()
-
-    apiFeatures.pagination(resPerPage);
-    const products = await apiFeatures.query;
-    let filteredProductsCount = products.length;
-    // const products = await apiFeatures.query;
-
-    if (!products)
-        return res.status(400).json({ message: 'error loading products' })
-    return res.status(200).json({
-        success: true,
-        products,
-        filteredProductsCount,
-        resPerPage,
-        productsCount,
-
-    })
+        return res.status(200).json({
+            success: true,
+            products,
+            filteredProductsCount,
+            resPerPage,
+            productsCount,
+        });
+    } catch (error) {
+        if (error.statusCode === 400) {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+        throw error;
+    }
     // if (!products)
     //     return res.status(400).json({ message: 'error loading products' })
 
@@ -123,14 +148,32 @@ exports.getProducts = async (req, res) => {
 exports.updateProduct = async (req, res, next) => {
     const product = await Product.findById(req.params.id);
     if (!product) {
+        await removeTemporaryImages(req.files);
         return res.status(404).json({
             success: false,
             message: 'Product not found'
         })
     }
 
+    let retainedImageIds = product.images.map(image => image.public_id);
+    if (req.body.retainedImages !== undefined) {
+        try {
+            retainedImageIds = JSON.parse(req.body.retainedImages);
+        } catch {
+            await removeTemporaryImages(req.files);
+            return res.status(400).json({ success: false, message: 'The retained image selection is invalid.' });
+        }
+        if (!Array.isArray(retainedImageIds)
+            || retainedImageIds.some(imageId => typeof imageId !== 'string')
+            || retainedImageIds.some(imageId => !product.images.some(image => image.public_id === imageId))) {
+            await removeTemporaryImages(req.files);
+            return res.status(400).json({ success: false, message: 'The retained image selection is invalid.' });
+        }
+    }
+    const retainedImages = product.images.filter(image => retainedImageIds.includes(image.public_id));
+    let uploadedImages = [];
+
     if (req.files?.length) {
-        const imagesLinks = [];
         try {
             for (const image of req.files) {
                 const result = await cloudinary.v2.uploader.upload(image.path, {
@@ -138,41 +181,74 @@ exports.updateProduct = async (req, res, next) => {
                     width: 150,
                     crop: 'scale',
                 });
-                imagesLinks.push({
+                uploadedImages.push({
                     public_id: result.public_id,
                     url: result.secure_url
                 });
             }
         } catch (error) {
+            await Promise.all(uploadedImages.map(image =>
+                cloudinary.v2.uploader.destroy(image.public_id)
+            ).map(promise => promise.catch(cleanupError => {
+                console.error('Failed to roll back product image upload:', cleanupError.message);
+            })));
             console.error('Product image upload failed:', error.message);
             return res.status(502).json({
                 success: false,
                 message: 'Product image upload failed. Check Cloudinary configuration and try again.'
             });
         } finally {
-            await Promise.all(req.files.map(async image => {
-                try {
-                    await fs.unlink(image.path);
-                } catch (error) {
-                    if (error.code !== 'ENOENT') {
-                        console.error('Failed to remove temporary product image:', error.message);
-                    }
-                }
-            }));
+            await removeTemporaryImages(req.files);
         }
-        req.body.images = imagesLinks;
+    }
+
+    const images = [...retainedImages, ...uploadedImages];
+    if (images.length === 0 || images.length > 10) {
+        await Promise.all(uploadedImages.map(image =>
+            cloudinary.v2.uploader.destroy(image.public_id)
+        ).map(promise => promise.catch(cleanupError => {
+            console.error('Failed to clean up invalid product image upload:', cleanupError.message);
+        })));
+        return res.status(400).json({
+            success: false,
+            message: images.length ? 'A product can have at most 10 images.' : 'A product must have at least one image.'
+        });
     }
 
     try {
-        const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, {
+        const updatedProduct = await Product.findByIdAndUpdate(req.params.id, {
+            name: req.body.name,
+            price: req.body.price,
+            description: req.body.description,
+            category: req.body.category,
+            stock: req.body.stock,
+            seller: req.body.seller,
+            images
+        }, {
             new: true,
             runValidators: true
         });
+        const retainedIds = images.map(image => image.public_id);
+        const removedImages = product.images.filter(image => !retainedIds.includes(image.public_id));
+        const cleanupResults = await Promise.allSettled(
+            removedImages.map(image => cloudinary.v2.uploader.destroy(image.public_id))
+        );
+        cleanupResults.forEach(result => {
+            if (result.status === 'rejected') {
+                console.error('Failed to delete replaced product image:', result.reason.message);
+            }
+        });
         return res.status(200).json({
             success: true,
-            product: updatedProduct
+            product: updatedProduct,
+            imageCleanupWarning: cleanupResults.some(result => result.status === 'rejected')
         });
     } catch (error) {
+        await Promise.all(uploadedImages.map(image =>
+            cloudinary.v2.uploader.destroy(image.public_id)
+        ).map(promise => promise.catch(cleanupError => {
+            console.error('Failed to clean up product image after update failure:', cleanupError.message);
+        })));
         if (error.name === 'ValidationError' || error.name === 'CastError') {
             return res.status(400).json({
                 success: false,
@@ -196,10 +272,58 @@ exports.deleteProduct = async (req, res, next) => {
         })
     }
 
+    const cleanupResults = await Promise.allSettled(
+        product.images.map(image => cloudinary.v2.uploader.destroy(image.public_id))
+    );
+    cleanupResults.forEach(result => {
+        if (result.status === 'rejected') {
+            console.error('Failed to delete product image:', result.reason.message);
+        }
+    });
+
     return res.status(200).json({
         success: true,
-        message: 'Product deleted'
+        message: 'Product deleted',
+        imageCleanupWarning: cleanupResults.some(result => result.status === 'rejected')
     })
+}
+
+exports.deleteProducts = async (req, res) => {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100
+        || ids.some(id => !mongoose.isValidObjectId(id))) {
+        return res.status(400).json({
+            success: false,
+            message: 'Select between 1 and 100 valid products to delete.'
+        });
+    }
+
+    const products = await Product.find({ _id: { $in: ids } });
+    if (products.length !== ids.length) {
+        return res.status(404).json({
+            success: false,
+            message: 'One or more selected products no longer exist. Refresh the list and try again.'
+        });
+    }
+
+    await Product.deleteMany({ _id: { $in: ids } });
+    const cleanupResults = await Promise.allSettled(
+        products.flatMap(product => product.images.map(image =>
+            cloudinary.v2.uploader.destroy(image.public_id)
+        ))
+    );
+    const imageCleanupWarning = cleanupResults.some(result => result.status === 'rejected');
+    cleanupResults.forEach(result => {
+        if (result.status === 'rejected') {
+            console.error('Failed to delete bulk product image:', result.reason.message);
+        }
+    });
+
+    return res.status(200).json({
+        success: true,
+        deletedCount: products.length,
+        imageCleanupWarning
+    });
 }
 
 exports.getAdminProducts = async (req, res, next) => {
@@ -220,36 +344,57 @@ exports.getAdminProducts = async (req, res, next) => {
 
 exports.createProductReview = async (req, res, next) => {
     const { rating, comment, productId } = req.body;
+    const numericRating = Number(rating);
+    if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5
+        || typeof comment !== 'string' || comment.trim().length < 2 || comment.length > 1000) {
+        return res.status(400).json({
+            success: false,
+            message: 'Please provide a rating from 1 to 5 and a review between 2 and 1000 characters.'
+        });
+    }
+
+    const product = await Product.findById(productId);
+    if (!product) {
+        return res.status(404).json({ success: false, message: 'Product not found.' });
+    }
+
+    const verifiedPurchase = await Order.exists({
+        user: req.user._id,
+        orderStatus: { $in: ['Completed', 'Delivered'] },
+        'orderItems.product': product._id
+    });
+    const isReviewed = product.reviews.find(
+        review => review.user.toString() === req.user._id.toString()
+    );
+    if (!verifiedPurchase) {
+        return res.status(403).json({
+            success: false,
+            message: 'Only customers with a completed order for this product can leave a review.'
+        });
+    }
+
     const review = {
         user: req.user._id,
         name: req.user.name,
-        rating: Number(rating),
-        comment
+        rating: numericRating,
+        comment: profanityFilter.clean(comment.trim()),
+        verifiedPurchase: true
     }
-    const product = await Product.findById(productId);
-    const isReviewed = product.reviews.find(
-        r => r.user.toString() === req.user._id.toString()
-    )
+
     if (isReviewed) {
-        product.reviews.forEach(review => {
-            if (review.user.toString() === req.user._id.toString()) {
-                review.comment = comment;
-                review.rating = rating;
-            }
-        })
+        Object.assign(isReviewed, review);
     } else {
         product.reviews.push(review);
-        product.numOfReviews = product.reviews.length
     }
-    product.ratings = product.reviews.reduce((acc, item) => item.rating + acc, 0) / product.reviews.length
+    product.numOfReviews = product.reviews.length;
+    product.ratings = product.reviews.reduce((total, item) => item.rating + total, 0)
+        / product.reviews.length;
     await product.save({ validateBeforeSave: false });
-    if (!product)
-        return res.status(400).json({
-            success: false,
-            message: 'review not posted'
-        })
     return res.status(200).json({
-        success: true
+        success: true,
+        review: product.reviews.find(
+            item => item.user.toString() === req.user._id.toString()
+        )
     })
 }
 
@@ -267,7 +412,9 @@ exports.deleteReview = async (req, res, next) => {
     const reviews = product.reviews.filter(review => review._id.toString() !== req.query.id.toString());
     const numOfReviews = reviews.length;
 
-    const ratings = product.reviews.reduce((acc, item) => item.rating + acc, 0) / reviews.length
+    const ratings = reviews.length
+        ? reviews.reduce((acc, item) => item.rating + acc, 0) / reviews.length
+        : 0
 
     await Product.findByIdAndUpdate(req.query.productId, {
         reviews,
@@ -285,60 +432,36 @@ exports.deleteReview = async (req, res, next) => {
 }
 
 exports.productSales = async (req, res, next) => {
-    const totalSales = await Order.aggregate([
-        {
-            $group: {
-                _id: null,
-                total: { $sum: "$itemsPrice" }
-
-            },
-
-        },
-    ])
-    console.log(totalSales)
-    const sales = await Order.aggregate([
-        { $project: { _id: 0, "orderItems": 1, totalPrice: true } },
-        { $unwind: "$orderItems" },
-
-        {
-            $group: {
-                _id: { product: "$orderItems.name" },
-                total: { $sum: { $multiply: ["$orderItems.price", "$orderItems.quantity"] } }
-            },
-        },
-    ])
-    console.log(sales)
-
-    if (!totalSales) {
-        return res.status(404).json({
-            message: 'error sales'
-        })
-
-    }
-    if (!sales) {
-        return res.status(404).json({
-            message: 'error sales'
-        })
-
+    let dateRange;
+    try {
+        dateRange = parseDateRange(req.query);
+    } catch (error) {
+        return res.status(400).json({ success: false, message: error.message });
     }
 
-    let totalPercentage = {}
-    totalPercentage = sales.map(item => {
+    const pipeline = completedSalesPipeline(dateRange);
+    const [sales, totals] = await Promise.all([
+        Order.aggregate([
+            ...pipeline,
+            { $unwind: '$orderItems' },
+            {
+                $group: {
+                    _id: '$orderItems.name',
+                    total: { $sum: { $multiply: ['$orderItems.price', '$orderItems.quantity'] } }
+                }
+            },
+            { $sort: { total: -1 } }
+        ]),
+        Order.aggregate([
+            ...pipeline,
+            { $group: { _id: null, total: { $sum: '$totalPrice' } } }
+        ])
+    ]);
 
-        // console.log( ((item.total/totalSales[0].total) * 100).toFixed(2))
-        percent = Number(((item.total / totalSales[0].total) * 100).toFixed(2))
-        total = {
-            name: item._id.product,
-            percent
-        }
-        return total
-    })
-    console.log(totalPercentage)
-    res.status(200).json({
-        success: true,
-        totalPercentage,
-        sales,
-        totalSales
-    })
-
+    const grandTotal = totals[0]?.total || 0;
+    const totalPercentage = sales.map(item => ({
+        name: item._id,
+        percent: grandTotal ? Number(((item.total / grandTotal) * 100).toFixed(2)) : 0
+    }));
+    return res.status(200).json({ success: true, totalPercentage, sales, totalSales: grandTotal });
 }

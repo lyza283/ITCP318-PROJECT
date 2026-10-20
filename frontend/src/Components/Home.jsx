@@ -1,149 +1,155 @@
-import React, { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import Product from './Product/Product'
-// import products from '../products.json'
 import Stack from '@mui/material/Stack'
-import Box from '@mui/material/Box';
-import Slider from '@mui/material/Slider';
+import Pagination from '@mui/material/Pagination'
 import MetaData from './Layout/MetaData'
-import Loader from './Layout/Loader';
-import Pagination from '@mui/material/Pagination';
-import axios from 'axios'
-
+import Loader from './Layout/Loader'
+import Product from './Product/Product'
 import { useDispatch, useSelector } from 'react-redux'
 import { getProducts } from '../actions/productActions'
+import { productCategories } from '../constants/productCategories'
+
+const initialFilters = {
+    minPrice: '',
+    maxPrice: '',
+    category: '',
+    minRating: '',
+    hasReviews: ''
+}
 
 const Home = () => {
-    // console.log(products)
-    // const [products, setProducts] = useState([])
-    const [price, setPrice] = useState([1, 1000]);
-    // const [loading, setLoading] = useState(true)
-    // const [productsCount, setProductsCount] = useState(0)
-    // const [resPerPage, setResPerPage] = useState(0)
-    // const [filteredProductsCount, setFilteredProductsCount] = useState(0)
+    const [filters, setFilters] = useState(initialFilters)
     const [currentPage, setCurrentPage] = useState(1)
-    let { keyword } = useParams();
-    const dispatch = useDispatch();
-    const { loading, products, error, productsCount, resPerPage, filteredProductsCount } = useSelector(state => state.products);
+    const { keyword = '' } = useParams()
+    const dispatch = useDispatch()
+    const { loading, products, error, productsCount, resPerPage, filteredProductsCount } = useSelector(state => state.products)
 
-    let count = productsCount;
+    const count = keyword || Object.values(filters).some(Boolean)
+        ? filteredProductsCount
+        : productsCount
 
-    if (keyword) {
-        count = filteredProductsCount
-    }
+    const stableFilters = useMemo(() => filters, [filters])
 
-
-
-    // const getProducts = async (keyword = '', price, page = 1) => {
-
-    //     let link = `http://localhost:4001/api/v1/products?keyword=${keyword}&price[gte]=${price[0]}&price[lte]=${price[1]}&page=${page}`
-    //     // http://localhost:4001/api/v1/products?keyword=''
-    //     // http://localhost:4001/api/v1/products?keyword=adid&page=1&price[gte]=100&price[lte]=1000
-    //     let res = await axios.get(link)
-    //     console.log(res.data.products)
-    //     setProducts(res.data.products)
-    //     setProductsCount(res.data.productsCount)
-    //     setFilteredProductsCount(res.data.filteredProductsCount)
-    //     setResPerPage(res.data.resPerPage)
-    //     setLoading(false)
-    // }
-
-    const handleChange = (event, newValue) => {
-        setPrice(newValue);
-    };
-
-    function valuetext(price) {
-        return `P${price.toString()}`;
-    }
-    // getProducts()
-    // useEffect(() => {
-    //     // getProducts(keyword, price, currentPage)
-    // }, [keyword, price, currentPage]);
     useEffect(() => {
+        dispatch(getProducts(currentPage, keyword, stableFilters))
+    }, [currentPage, dispatch, keyword, stableFilters])
 
-        dispatch(getProducts(currentPage, keyword, price,))
-    }, [currentPage, keyword, price,]);
+    const updateFilter = (field, value) => {
+        setCurrentPage(1)
+        setFilters(current => ({ ...current, [field]: value }))
+    }
+
+    const clearFilters = () => {
+        setCurrentPage(1)
+        setFilters(initialFilters)
+    }
 
     return (
         <>
-            <MetaData title={'Explore Supplies'} />
-            {loading ? <Loader /> : (<div className="container container-fluid">
-                <h1 id="products_heading">Latest Products</h1>
-                <section id="products" className="container mt-5">
-                    {/* <div className="row">
-                        {products && products.map(product => (
-                            <Product key={product._id} product={product} />
-                            // <Product product={product} />
-
-
-                        ))}
-                    </div> */}
-                    <div className="row">
-                        {keyword ? (
+            <MetaData title="Explore Supplies" />
+            <main className="container container-fluid storefront-page">
+                {error && <div className="alert alert-danger" role="alert">{error}</div>}
+                <section className="product-filter-panel storefront-filter-panel" aria-label="Product filters">
+                    <div className="product-filter-heading">
+                        <div>
+                            <h2>Filter products</h2>
+                        </div>
+                        <button type="button" className="btn btn-link" onClick={clearFilters}>Clear filters</button>
+                    </div>
+                    <div className="product-filter-controls">
+                        <fieldset className="product-filter-group product-filter-price">
+                            <legend>Price range</legend>
+                            <div className="price-filter-fields">
+                                <label>
+                                    <span>Minimum</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={filters.minPrice}
+                                        onChange={event => updateFilter('minPrice', event.target.value)}
+                                        placeholder="₱0"
+                                    />
+                                </label>
+                                <label>
+                                    <span>Maximum</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={filters.maxPrice}
+                                        onChange={event => updateFilter('maxPrice', event.target.value)}
+                                        placeholder="Any"
+                                    />
+                                </label>
+                            </div>
+                        </fieldset>
+                        <fieldset className="product-filter-group">
+                            <legend>Category</legend>
+                            <select value={filters.category} onChange={event => updateFilter('category', event.target.value)}>
+                                <option value="">All categories</option>
+                                {productCategories.map(category => <option key={category} value={category}>{category}</option>)}
+                            </select>
+                        </fieldset>
+                        <fieldset className="product-filter-group">
+                            <legend>Minimum rating</legend>
+                            <select value={filters.minRating} onChange={event => updateFilter('minRating', event.target.value)}>
+                                <option value="">Any rating</option>
+                                {[4, 3, 2, 1].map(rating => (
+                                    <option key={rating} value={rating}>{rating} stars and above</option>
+                                ))}
+                            </select>
+                        </fieldset>
+                        <fieldset className="product-filter-group">
+                            <legend>Customer reviews</legend>
+                            <select value={filters.hasReviews} onChange={event => updateFilter('hasReviews', event.target.value)}>
+                                <option value="">All products</option>
+                                <option value="true">With reviews</option>
+                                <option value="false">Without reviews</option>
+                            </select>
+                        </fieldset>
+                    </div>
+                </section>
+                <div className="storefront-heading">
+                    <div>
+                        <p className="admin-eyebrow">GUHITSPACE COLLECTION</p>
+                        <h1 id="products_heading">Explore supplies</h1>
+                    </div>
+                </div>
+                <section className="storefront-results" aria-label="Product catalogue">
+                        {loading ? <Loader /> : products.length ? (
                             <>
-                                <div className="col-6 col-md-3 mt-5 mb-5">
-                                    <Box sx={{ width: 150 }}>
-                                        <Slider
-                                            getAriaLabel={() => 'Price Filter'}
-                                            value={price}
-                                            onChange={handleChange}
-                                            valueLabelDisplay="on"
-                                            getAriaValueText={valuetext}
-                                            min={1}
-                                            max={1000}
-
-                                        />
-                                    </Box>
-                                    <div className="mt-5">
-                                        <h4 className="mb-3">
-                                            Categories
-                                        </h4>
-
-                                    </div>
-
-
-
+                                <div className="product-grid">
+                                    {products.map(product => <Product key={product._id} product={product} />)}
                                 </div>
-
-                                <div className="col-6 col-md-9">
-                                    <div className="row">
-                                        {products.map(product => (
-                                            <Product key={product._id} product={product} />
-                                        ))}
+                                {resPerPage < count && (
+                                    <div className="d-flex justify-content-center mt-5">
+                                        <Stack spacing={2}>
+                                            <Pagination
+                                                count={Math.ceil(count / resPerPage)}
+                                                page={currentPage}
+                                                onChange={(event, page) => setCurrentPage(page)}
+                                                color="primary"
+                                                variant="outlined"
+                                                shape="rounded"
+                                                showFirstButton
+                                                showLastButton
+                                                size="large"
+                                            />
+                                        </Stack>
                                     </div>
-                                </div>
+                                )}
                             </>
                         ) : (
-                            products.map(product => (
-                                <Product key={product._id} product={product} />
-                            ))
+                            <div className="product-no-results">
+                                <i className="fa fa-search" aria-hidden="true"></i>
+                                <h2>No products found</h2>
+                                <p>Try adjusting your filters or search term.</p>
+                                <button className="btn btn-primary" type="button" onClick={clearFilters}>Clear filters</button>
+                            </div>
                         )}
-
-                    </div>
-                    {resPerPage < count && (
-                        <div className="d-flex justify-content-center mt-5">
-                            <Stack spacing={2}>
-                                <Pagination
-                                    count={Math.ceil(count / resPerPage)}
-                                    page={currentPage}
-                                    onChange={(event, value) => setCurrentPage(value)}
-                                    // onChange={setCurrentPageNo}
-                                    color="primary"
-                                    variant="outlined"
-                                    shape="rounded"
-                                    showFirstButton
-                                    showLastButton
-                                    size="large"
-                                    sx={{
-                                        backgroundColor: 'white',
-
-                                    }}
-                                />
-                            </Stack>
-                        </div>
-                    )}
                 </section>
-            </div>)}
+            </main>
         </>
     )
 }

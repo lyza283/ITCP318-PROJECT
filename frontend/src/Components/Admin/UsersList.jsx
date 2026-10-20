@@ -5,7 +5,6 @@ import 'react-toastify/dist/ReactToastify.css';
 
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
-import Sidebar from './SideBar'
 
 import { errMsg, successMsg } from '../Utils/helpers';
 import adminApi from './adminApi'
@@ -54,47 +53,48 @@ const UsersList = () => {
         {
             field: 'id',
             headerName: 'User ID',
-            flex: 1,
+            flex: 2,
+            minWidth: 380,
             renderCell: (params) => <span style={{ wordBreak: 'break-all' }}>{params.value}</span>
         },
         {
             field: 'name',
             headerName: 'Name',
-
-            width: 130,
-            align: 'right',
-            headerAlign: 'right'
+            flex: 1,
+            minWidth: 170
         },
         {
             field: 'email',
             headerName: 'Email',
-            width: 120,
-            align: 'right',
-            headerAlign: 'right'
+            flex: 1,
+            minWidth: 170,
+            renderCell: (params) => (
+                <span title={params.value} className="admin-user-email">
+                    {params.value}
+                </span>
+            )
         },
         {
             field: 'role',
             headerName: 'Role',
-            width: 120,
-            align: 'right',
-            headerAlign: 'right'
+            flex: 1,
+            minWidth: 170
         },
 
         {
             field: 'actions',
             headerName: 'Actions',
-            width: 120,
+            flex: 1,
+            minWidth: 170,
             sortable: false,
             filterable: false,
             renderCell: (params) => (
-
                 <>
-                    {console.log(params)}
-                    <Link to={`/admin/user/${params.id}`} className="btn btn-primary py-1 px-2">
-                        <i className="fa fa-pencil"></i>
+                    <Link to={`/admin/user/${params.id}`} className="btn btn-primary py-1 px-2" aria-label={`Edit ${params.row.name}`}>
+                        <i className="fa fa-pencil" aria-hidden="true"></i>
                     </Link>
-                    <button className="btn btn-danger py-1 px-2 ml-2" onClick={() => deleteUserHandler(params.id)}>
-                        <i className="fa fa-trash"></i>
+                    <button type="button" className="btn btn-danger py-1 px-2 ml-2" onClick={() => deleteUserHandler(params.id)} aria-label={`Delete ${params.row.name}`}>
+                        <i className="fa fa-trash" aria-hidden="true"></i>
                     </button>
                 </>
             )
@@ -111,30 +111,21 @@ const UsersList = () => {
     return (
         <>
             <MetaData title={'All Users'} />
-            <div className="row">
-                <div className="col-12 col-md-2">
-                    <Sidebar />
-                </div>
-                <div className="col-12 col-md-10">
-                    <>
-                        <h1 className="my-5">All Users</h1>
-                        {loading ? <Loader /> : (
-                            <div style={{ width: '100%' }}>
-                                <DataGrid
-                                    rows={rows}
-                                    columns={columns}
-
-                                    pageSize={5}
-                                    rowsPerPageOptions={[5, 10, 25]}
-                                    disableSelectionOnClick
-                                    getRowId={(row) => row.id}
-                                    showToolbar
-                                />
-                            </div>
-                        )}
-                    </>
-                </div>
-            </div>
+            <main className="admin-page-content">
+                <h1 className="admin-page-title">All Users</h1>
+                {loading ? <Loader /> : (
+                    <div className="admin-data-grid">
+                        <DataGrid
+                            rows={rows}
+                            columns={columns}
+                            pageSizeOptions={[5, 10, 25]}
+                            disableSelectionOnClick
+                            getRowId={(row) => row.id}
+                            showToolbar
+                        />
+                    </div>
+                )}
+            </main>
         </>
     )
 }

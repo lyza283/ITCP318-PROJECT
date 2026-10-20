@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import '../../App.css'
-import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 // import { getUser, logout } from '../Utils/helpers';
@@ -8,20 +7,11 @@ import { useDispatch, useSelector } from 'react-redux'
 import { logout } from '../../actions/userActions'
 
 import Search from './Search'
+import Sidebar from '../Admin/SideBar'
 export const Header = () => {
     const dispatch = useDispatch();
-    const { user, loading } = useSelector(state => state.auth)
+    const { user } = useSelector(state => state.auth)
     const { cartItems } = useSelector(state => state.cart)
-    // const [user, setUser] = useState({})
-    const navigate = useNavigate()
-
-    // const logoutHandler = () => {
-    //     logout(navigate('/'));
-
-    //     toast.success('log out', {
-    //         position: 'bottom-right'
-    //     });
-    // }
 
     const logoutHandler = () => {
         dispatch(logout());
@@ -29,27 +19,20 @@ export const Header = () => {
             position: 'bottom-right'
         });
     }
-    // useEffect(() => {
-    //     setUser(getUser())
-    // }, []);
     return (
         <>
-            <nav className="navbar row">
-                <div className="col-12 col-md-3">
-                    <div className="navbar-brand">
-                        <Link to="/">
-                            <img src="/images/guhit_space_logo.png" alt="Guhit Space" />
-
-                        </Link>
-
-                    </div>
-
+            <nav className="navbar site-navbar">
+                <div className="navbar-brand">
+                    <Link to="/">
+                        <img src="/images/guhit_space_logo.png" alt="Guhit Space" />
+                    </Link>
                 </div>
-                <Search />
-                <div className="col-12 col-md-3 mt-4 mt-md-0 text-center">
-
-                    {user ? (<div className="ml-4 dropdown d-inline">
-                        <Link to="#!" className="btn dropdown-toggle text-white mr-4" type="button" id="dropDownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <div className="header-search">
+                    <Search />
+                </div>
+                <div className="header-actions">
+                    {user ? (<div className="dropdown d-inline">
+                        <Link to="#!" className="btn dropdown-toggle text-white" type="button" id="dropDownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                             <figure className="avatar avatar-nav">
                                 <img
                                     src={user.avatar && user.avatar.url}
@@ -76,15 +59,13 @@ export const Header = () => {
                         </div>
                     </div>) : <Link to="/login" className="btn ml-4" id="login_btn">Login</Link>}
 
-                    <Link to="/cart" style={{ textDecoration: 'none' }} >
-                        <span id="cart" className="ml-3">Cart</span>
+                    <Link to="/cart" className="header-cart" style={{ textDecoration: 'none' }} >
+                        <span id="cart">Cart</span>
                         <span className="ml-1" id="cart_count">{cartItems ? cartItems.length : null}</span>
-                        {/* <span className="ml-1" id="cart_count">2</span> */}
                     </Link>
-                    {/* <span className="ml-1" id="cart_count">{cartItems ? cartItems.length : null}</span>  */}
                 </div>
-
             </nav>
+            {user?.role === 'admin' && <Sidebar />}
         </>
     )
 }

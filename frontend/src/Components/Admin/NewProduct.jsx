@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MetaData from '../Layout/MetaData'
-import Sidebar from './SideBar'
 import adminApi from './adminApi'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { productSchema } from '../../validation/schemas'
+import { artSupplyCategories } from '../../constants/productCategories'
 
 const NewProduct = () => {
 
     const [name, setName] = useState('');
     const [price, setPrice] = useState(0);
     const [description, setDescription] = useState('');
-    const [category, setCategory] = useState('Electronics');
+    const [category, setCategory] = useState('Sketchbooks');
     const [stock, setStock] = useState(0);
     const [seller, setSeller] = useState('');
     const [images, setImages] = useState([]);
@@ -20,25 +21,25 @@ const NewProduct = () => {
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState('')
 
-    const categories = [
-        'Electronics',
-        'Cameras',
-        'Laptops',
-        'Accessories',
-        'Headphones',
-        'Food',
-        "Books",
-        'Clothes/Shoes',
-        'Beauty/Health',
-        'Sports',
-        'Outdoor',
-        'Home'
-    ]
-
     let navigate = useNavigate()
 
-    const submitHandler = (e) => {
+    const submitHandler = async (e) => {
         e.preventDefault();
+
+        try {
+            await productSchema.validate({
+                name,
+                price,
+                description,
+                category,
+                stock,
+                seller,
+                imageCount: images.length
+            }, { abortEarly: false })
+        } catch (validationError) {
+            toast.error(validationError.errors[0], { position: 'bottom-right' })
+            return
+        }
 
         const formData = new FormData();
         formData.set('name', name);
@@ -107,16 +108,11 @@ const NewProduct = () => {
     return (
         <>
             <MetaData title={'New Product'} />
-            <div className="row">
-                <div className="col-12 col-md-2">
-                    <Sidebar />
-                </div>
-
-                <div className="col-12 col-md-10">
-                    <>
-                        <div className="wrapper my-5">
-                            <form className="shadow-lg" onSubmit={submitHandler} encType='multipart/form-data'>
-                                <h1 className="mb-4">New Product</h1>
+            <main className="admin-page-content">
+                <div className="wrapper my-5 product-editor-wrapper">
+                    <form className="shadow-lg product-editor-form" onSubmit={submitHandler} encType='multipart/form-data'>
+                        <h1 className="mb-4">New Product</h1>
+                        <p className="product-editor-subtitle">Enter the product details and upload one or more images.</p>
 
                                 <div className="form-group">
                                     <label htmlFor="name_field">Name</label>
@@ -140,15 +136,15 @@ const NewProduct = () => {
                                     />
                                 </div>
 
-                                <div className="form-group">
+                                <div className="form-group product-editor-description">
                                     <label htmlFor="description_field">Description</label>
-                                    <textarea className="form-control" id="description_field" rows="8" value={description} onChange={(e) => setDescription(e.target.value)}></textarea>
+                                    <textarea className="form-control" id="description_field" rows="5" value={description} onChange={(e) => setDescription(e.target.value)}></textarea>
                                 </div>
 
                                 <div className="form-group">
                                     <label htmlFor="category_field">Category</label>
                                     <select className="form-control" id="category_field" value={category} onChange={(e) => setCategory(e.target.value)}>
-                                        {categories.map(category => (
+                                        {artSupplyCategories.map(category => (
                                             <option key={category} value={category} >{category}</option>
                                         ))}
 
@@ -176,7 +172,7 @@ const NewProduct = () => {
                                     />
                                 </div>
 
-                                <div className='form-group'>
+                                <div className='form-group product-editor-images'>
                                     <label>Images</label>
 
                                     <div className='custom-file'>
@@ -187,9 +183,10 @@ const NewProduct = () => {
                                             id='customFile'
                                             onChange={onChange}
                                             multiple
+                                            accept="image/jpeg,image/png,image/webp"
                                         />
                                         <label className='custom-file-label' htmlFor='customFile'>
-                                            Choose Images
+                                            Choose Images (up to 10)
                                         </label>
                                     </div>
 
@@ -209,11 +206,9 @@ const NewProduct = () => {
                                     {loading ? 'CREATING...' : 'CREATE'}
                                 </button>
 
-                            </form>
-                        </div>
-                    </>
+                    </form>
                 </div>
-            </div>
+            </main>
 
         </>
     )

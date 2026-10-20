@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from "react-router-dom";
 import { countries } from 'countries-list'
 import MetaData from '../Layout/MetaData'
@@ -28,90 +28,85 @@ const Shipping = () => {
         <>
             <MetaData title={'Shipping Info'} />
             <CheckoutSteps shipping />
-            <div className="row wrapper">
-                <div className="col-10 col-lg-5">
-                    <form
-                        className="shadow-lg"
-                        onSubmit={submitHandler}
-                    >
-                        <h1 className="mb-4">Shipping Info</h1>
-                        <div className="form-group">
-                            <label htmlFor="address_field">Address</label>
-                            <input
-                                type="text"
-                                id="address_field"
-                                className="form-control"
-                                value={address}
-                                onChange={(e) => setAddress(e.target.value)}
-                                required
-                            />
-                        </div>
+            <main className="shipping-page">
+                <form className="shipping-form" onSubmit={submitHandler}>
+                    <h1>Shipping Info</h1>
+                    <div className="form-group shipping-address-field">
+                        <label htmlFor="address_field">Address</label>
+                        <input
+                            type="text"
+                            id="address_field"
+                            className="form-control"
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                            required
+                        />
+                    </div>
 
-                        <div className="form-group">
-                            <label htmlFor="city_field">City</label>
-                            <input
-                                type="text"
-                                id="city_field"
-                                className="form-control"
-                                value={city}
-                                onChange={(e) => setCity(e.target.value)}
-                                required
-                            />
-                        </div>
+                    <div className="form-group">
+                        <label htmlFor="city_field">City</label>
+                        <input
+                            type="text"
+                            id="city_field"
+                            className="form-control"
+                            value={city}
+                            onChange={(e) => setCity(e.target.value)}
+                            required
+                        />
+                    </div>
 
-                        <div className="form-group">
-                            <label htmlFor="phone_field">Phone No</label>
-                            <input
-                                type="phone"
-                                id="phone_field"
-                                className="form-control"
-                                value={phoneNo}
-                                onChange={(e) => setPhoneNo(e.target.value)}
-                                required
-                            />
-                        </div>
+                    <div className="form-group">
+                        <label htmlFor="phone_field">Phone No</label>
+                        <input
+                            type="phone"
+                            id="phone_field"
+                            className="form-control"
+                            value={phoneNo}
+                            onChange={(e) => setPhoneNo(e.target.value)}
+                            required
+                        />
+                    </div>
 
-                        <div className="form-group">
-                            <label htmlFor="postal_code_field">Postal Code</label>
-                            <input
-                                type="number"
-                                id="postal_code_field"
-                                className="form-control"
-                                value={postalCode}
-                                onChange={(e) => setPostalCode(e.target.value)}
-                                required
-                            />
-                        </div>
+                    <div className="form-group">
+                        <label htmlFor="postal_code_field">Postal Code</label>
+                        <input
+                            type="number"
+                            id="postal_code_field"
+                            className="form-control"
+                            value={postalCode}
+                            onChange={(e) => setPostalCode(e.target.value)}
+                            required
+                        />
+                    </div>
 
-                        <div className="form-group">
-                            <label htmlFor="country_field">Country</label>
-                            <select
-                                id="country_field"
-                                className="form-control"
-                                value={country}
-                                onChange={(e) => setCountry(e.target.value)}
-                                required
-                            >
-
-                                {countriesList.map(country => (
-                                    <option key={country.name} value={country.name}>
-                                        {country.name}
-                                    </option>
-                                ))}
-
-                            </select>
-                        </div>
-
-                        <button
-                            id="shipping_btn"
-                            type="submit"
-                            className="btn btn-block py-3"
+                    <div className="form-group shipping-country-field">
+                        <label htmlFor="country_field">Country</label>
+                        <select
+                            id="country_field"
+                            className="form-control"
+                            value={country}
+                            onChange={(e) => setCountry(e.target.value)}
+                            required
                         >
-                            CONTINUE
-                        </button>
-                    </form>
-                </div>
-            </div>
+
+                            {countriesList.map(country => (
+                                <option key={country.name} value={country.name}>
+                                    {country.name}
+                                </option>
+                            ))}
+
+                        </select>
+                    </div>
+
+                    <button
+                        id="shipping_btn"
+                        type="submit"
+                        className="btn btn-block py-3 shipping-submit"
+                    >
+                        CONTINUE
+                    </button>
+                </form>
+            </main>
 
         </>
     )

@@ -3,11 +3,14 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 
 import Loader from '../Layout/Loader'
 import MetaData from '../Layout/MetaData';
+import { toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css';
+import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google'
 // import axios from 'axios';
 // import { getUser, authenticate } from '../Utils/helpers';
 import { useDispatch, useSelector } from 'react-redux'
-import { login, clearErrors } from '../../actions/userActions'
+import { login, loginWithGoogle, clearErrors } from '../../actions/userActions'
+import { loginSchema } from '../../validation/schemas'
 
 const Login = () => {
     const { isAuthenticated, error, loading, user } = useSelector(state => state.auth)
@@ -20,7 +23,9 @@ const Login = () => {
 
     const submitHandler = (e) => {
         e.preventDefault();
-        dispatch(login(email, password))
+        loginSchema.validate({ email, password }, { abortEarly: false })
+            .then(() => dispatch(login(email.trim(), password)))
+            .catch(validationError => toast.error(validationError.errors[0]))
     }
 
     // const login = async (email, password) => {
@@ -43,7 +48,9 @@ const Login = () => {
     // }
 
     const redirect = location.search ? new URLSearchParams(location.search).get('redirect') : ''
-    console.log(redirect)
+    const redirectPath = redirect && /^(shipping|confirm|payment|orders\/me|order\/[a-f\d]+)$/i.test(redirect)
+        ? `/${redirect}`
+        : ''
     // useEffect(() => {
     //     if (getUser()) {
     //         navigate('/')
@@ -57,19 +64,18 @@ const Login = () => {
     // }, [])
 
     useEffect(() => {
-        if (isAuthenticated && redirect === 'shipping') {
-            navigate(`/${redirect}`)
+        if (isAuthenticated && redirectPath) {
+            navigate(redirectPath)
         } else if (isAuthenticated && user?.role === 'admin') {
             navigate('/dashboard')
         } else if (isAuthenticated) {
             navigate('/')
         }
         if (error) {
-            // alert.error(error);
-            console.log(error)
+            toast.error(error)
             dispatch(clearErrors());
         }
-    }, [error, isAuthenticated, user, dispatch, navigate, redirect])
+    }, [error, isAuthenticated, user, dispatch, navigate, redirectPath])
 
     return (
         <>
@@ -89,6 +95,8 @@ const Login = () => {
                                         type="email"
                                         id="email_field"
                                         className="form-control"
+                                        autoComplete="email"
+                                        required
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
                                     />
@@ -100,6 +108,9 @@ const Login = () => {
                                         type="password"
                                         id="password_field"
                                         className="form-control"
+                                        autoComplete="current-password"
+                                        minLength={6}
+                                        required
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                     />
@@ -111,9 +122,31 @@ const Login = () => {
                                     id="login_button"
                                     type="submit"
                                     className="btn btn-block py-3"
+                                    disabled={loading}
                                 >
-                                    LOGIN
+                                    {loading ? 'SIGNING IN...' : 'LOGIN'}
                                 </button>
+
+                                <div className="social-login-divider"><span>or continue with</span></div>
+                                {import.meta.env.VITE_GOOGLE_CLIENT_ID ? (
+                                    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+                                        <div className="google-login-button">
+                                            <GoogleLogin
+                                                onSuccess={credentialResponse => {
+                                                    if (credentialResponse.credential) {
+                                                        dispatch(loginWithGoogle(credentialResponse.credential))
+                                                    } else {
+                                                        toast.error('Google did not return a sign-in credential.')
+                                                    }
+                                                }}
+                                                onError={() => toast.error('Google sign-in failed. Please try again.')}
+                                                useOneTap={false}
+                                            />
+                                        </div>
+                                    </GoogleOAuthProvider>
+                                ) : (
+                                    <p className="social-login-setup-note">Google sign-in needs VITE_GOOGLE_CLIENT_ID configured by the project administrator.</p>
+                                )}
 
                                 <Link to="/register" className="float-right mt-3">New User?</Link>
                             </form>

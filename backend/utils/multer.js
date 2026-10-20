@@ -2,14 +2,13 @@ const multer = require("multer");
 const path = require("path");
 
 module.exports = multer({
-    limits: { fieldSize: 100 * 1024 * 1024 },
+    limits: { fieldSize: 1 * 1024 * 1024, fileSize: 10 * 1024 * 1024, files: 10 },
     storage: multer.diskStorage({}),
     fileFilter: (req, file, cb) => {
         let ext = path.extname(file.originalname).toLowerCase();
-        if (ext !== ".jpg" && ext !== ".jpeg" && ext !== ".png") {
-            // cb(new Error("Unsupported file type!"), false);
-            console.log("Unsupported file type!")
-            return;
+        if (![".jpg", ".jpeg", ".png", ".webp"].includes(ext)
+            || !["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)) {
+            return cb(new Error("Only JPG, PNG, and WebP images are supported."));
         }
         cb(null, true);
     },

@@ -70,7 +70,6 @@ export const login = (email, password) => async (dispatch) => {
             },
             withCredentials: true,
         }
-
         const { data } = await axios.post(`${import.meta.env.VITE_API}/login`, { email, password }, config)
         console.log(data.user)
         dispatch({
@@ -78,11 +77,35 @@ export const login = (email, password) => async (dispatch) => {
             payload: data.user
         })
     } catch (error) {
-        console.log(error.response.data.message)
-
         dispatch({
             type: LOGIN_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message
+                || (error.request
+                    ? 'Unable to connect to the server. Please check that the backend is running.'
+                    : error.message)
+                || 'Unable to log in. Please try again.'
+        })
+    }
+}
+
+export const loginWithGoogle = (credential) => async (dispatch) => {
+    try {
+        dispatch({ type: LOGIN_REQUEST })
+        const { data } = await axios.post(`${import.meta.env.VITE_API}/auth/google`, { credential }, {
+            withCredentials: true
+        })
+        dispatch({
+            type: LOGIN_SUCCESS,
+            payload: data.user
+        })
+    } catch (error) {
+        dispatch({
+            type: LOGIN_FAIL,
+            payload: error.response?.data?.message
+                || (error.request
+                    ? 'Unable to connect to the server. Please check that the backend is running.'
+                    : error.message)
+                || 'Google sign-in failed. Please try again.'
         })
     }
 }

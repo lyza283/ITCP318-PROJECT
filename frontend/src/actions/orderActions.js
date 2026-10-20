@@ -42,11 +42,13 @@ export const createOrder = (order) => async (dispatch) => {
             type: CREATE_ORDER_SUCCESS,
             payload: data
         })
+        return data.order
     } catch (error) {
         dispatch({
             type: CREATE_ORDER_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || error.message || 'Unable to place order.'
         })
+        return null
     }
 
 }
@@ -62,7 +64,7 @@ export const myOrders = () => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: MY_ORDERS_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || error.message || 'Unable to load orders.'
         })
     }
 }
@@ -78,7 +80,7 @@ export const getOrderDetails = (id) => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: ORDER_DETAILS_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || error.message || 'Unable to load order details.'
         })
     }
 }
@@ -98,7 +100,7 @@ export const allOrders = () => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: ALL_ORDERS_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || error.message || 'Unable to load orders.'
         })
     }
 }
@@ -120,7 +122,7 @@ export const updateOrder = (id, orderData) => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: UPDATE_ORDER_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || error.message || 'Unable to update order.'
         })
 
     }
@@ -137,7 +139,7 @@ export const deleteOrder = (id) => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: DELETE_ORDER_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || error.message || 'Unable to delete order.'
         })
     }
 }

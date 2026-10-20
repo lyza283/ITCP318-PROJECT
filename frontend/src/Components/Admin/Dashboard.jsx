@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
-import Sidebar from './SideBar'
 import adminApi from './adminApi'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -11,25 +10,35 @@ import ProductSalesChart from './ProductSalesChart';
 import UserSalesChart from './UserSalesChart';
 import MonthlySalesChart from './MonthlySalesChart';
 
+const today = new Date().toISOString().slice(0, 10)
+const thirtyDaysAgo = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
 const Dashboard = () => {
 
-    const [products, setProducts] = useState([])
-    // const [users, setUsers] = useState([])
-    // const [orders, setOrders] = useState([])
-    const [loading, setLoading] = useState(true)
-    // const [totalAmount, setTotalAmount] = useState([])
-    let outOfStock = 0;
-    products.forEach(product => {
-        if (product.stock === 0) {
-            outOfStock += 1;
-        }
+    const [dashboardData, setDashboardData] = useState({
+        products: [],
+        orders: [],
+        users: [],
     })
+    const [loading, setLoading] = useState(true)
+    const [startDate, setStartDate] = useState(thirtyDaysAgo)
+    const [endDate, setEndDate] = useState(today)
+
     useEffect(() => {
         let active = true
-        adminApi.get('/admin/products')
-            .then(({ data }) => {
-                if (active) setProducts(data.products)
+        Promise.all([
+            adminApi.get('/admin/products'),
+            adminApi.get('/admin/orders'),
+            adminApi.get('/admin/users'),
+        ])
+            .then(([productsResponse, ordersResponse, usersResponse]) => {
+                if (active) {
+                    setDashboardData({
+                        products: productsResponse.data.products,
+                        orders: ordersResponse.data.orders,
+                        users: usersResponse.data.users,
+                    })
+                }
             })
             .catch(error => {
                 if (active) {
@@ -47,107 +56,86 @@ const Dashboard = () => {
         }
     }, [])
 
+    const outOfStock = dashboardData.products.filter(product => product.stock === 0).length
+    const stats = [
+        { label: 'Products', value: dashboardData.products.length, icon: 'fa-product-hunt', to: '/admin/products' },
+        { label: 'Orders', value: dashboardData.orders.length, icon: 'fa-shopping-basket', to: '/admin/orders' },
+        { label: 'Users', value: dashboardData.users.length, icon: 'fa-users', to: '/admin/users' },
+        { label: 'Out of stock', value: outOfStock, icon: 'fa-exclamation-circle' },
+    ]
+
     return (
         <>
-            <div className="row">
-                <div className="col-12 col-md-2">
-                    <Sidebar />
+            <MetaData title="Admin Dashboard" />
+            <main className="admin-page-content dashboard-page">
+                <div className="admin-page-heading">
+                    <div>
+                        <p className="admin-eyebrow">ADMINISTRATION</p>
+                        <h1>Dashboard</h1>
+                    </div>
                 </div>
 
-                <div className="col-12 col-md-10">
-                    <h1 className="my-4">Dashboard</h1>
-
-                    {loading ? <Loader /> : (
-                        <>
-                            <MetaData title={'Admin Dashboard'} />
-
-                            <div className="row pr-4">
-                                <div className="col-xl-12 col-sm-12 mb-3">
-                                    <div className="card text-white bg-primary o-hidden h-100">
-                                        <div className="card-body">
-                                            {/* <div className="text-center card-font-size">Total Amount<br /> <b>${totalAmount && totalAmount.toFixed(2)}</b>
-                                            </div> */}
-
+                {loading ? <Loader /> : (
+                    <>
+                        <section className="dashboard-stats" aria-label="Store overview">
+                            {stats.map(stat => {
+                                const content = (
+                                    <>
+                                        <div className="dashboard-stat-top">
+                                            <span className="dashboard-stat-label">{stat.label}</span>
+                                            <span className="dashboard-stat-icon">
+                                                <i className={`fa ${stat.icon}`} aria-hidden="true"></i>
+                                            </span>
                                         </div>
+                                        <strong className="dashboard-stat-value">{stat.value}</strong>
+                                        {stat.to && <span className="dashboard-stat-link">View details <i className="fa fa-arrow-right" aria-hidden="true"></i></span>}
+                                    </>
+                                )
+
+                                return stat.to ? (
+                                    <Link key={stat.label} to={stat.to} className="dashboard-stat-card">
+                                        {content}
+                                    </Link>
+                                ) : (
+                                    <div key={stat.label} className="dashboard-stat-card">
+                                        {content}
                                     </div>
-                                </div>
+                                )
+                            })}
+                        </section>
+
+                        <div className="dashboard-date-filter">
+                            <div>
+                                <h2>Sales date range</h2>
                             </div>
-                            <div className="row pr-4">
-                                <div className="col-xl-3 col-sm-6 mb-3">
-                                    <div className="card text-white bg-success o-hidden h-100">
-                                        <div className="card-body">
-                                            <div className="text-center card-font-size">Products<br /> <b>{products && products.length}</b></div>
-                                        </div>
+                            <label>
+                                <span>From</span>
+                                <input type="date" value={startDate} max={endDate} onChange={event => setStartDate(event.target.value)} />
+                            </label>
+                            <label>
+                                <span>To</span>
+                                <input type="date" value={endDate} min={startDate} max={today} onChange={event => setEndDate(event.target.value)} />
+                            </label>
+                        </div>
 
-                                        <Link className="card-footer text-white clearfix small z-1" to="/admin/products">
-                                            <span className="float-left">View Details</span>
-                                            <span className="float-right">
-                                                <i className="fa fa-angle-right"></i>
-                                            </span>
-                                        </Link>
-                                    </div>
-                                </div>
-                                <div className="col-xl-3 col-sm-6 mb-3">
-                                    <div className="card text-white bg-danger o-hidden h-100">
-
-                                        {/* <div className="card-body">
-                                            <div className="text-center card-font-size">Orders<br /> <b>{orders && orders.length}</b></div>
-                                        </div> */}
-
-                                        <Link className="card-footer text-white clearfix small z-1" to="/admin/orders">
-                                            <span className="float-left">View Details</span>
-                                            <span className="float-right">
-                                                <i className="fa fa-angle-right"></i>
-                                            </span>
-                                        </Link>
-                                    </div>
-                                </div>
-
-
-                                <div className="col-xl-3 col-sm-6 mb-3">
-                                    <div className="card text-white bg-info o-hidden h-100">
-
-                                        {/* <div className="card-body">
-                                            <div className="text-center card-font-size">Users<br /> <b>{users && users.length}</b></div>
-                                        </div> */}
-
-                                        <Link className="card-footer text-white clearfix small z-1" to="/admin/users">
-                                            <span className="float-left">View Details</span>
-                                            <span className="float-right">
-                                                <i className="fa fa-angle-right"></i>
-                                            </span>
-                                        </Link>
-                                    </div>
-                                </div>
-                                <div className="col-xl-3 col-sm-6 mb-3">
-                                    <div className="card text-white bg-warning o-hidden h-100">
-                                        {/*<div className="card-body">
-                                            <div className="text-center card-font-size">Out of Stock<br /> <b>0</b></div>
-                                        </div>*/}
-
-                                        <div className="card-body">
-                                            <div className="text-center card-font-size">Out of Stock<br /> <b>{outOfStock}</b></div>
-                                        </div>
-                                    </div>
-                                </div>
+                        <section className="dashboard-charts" aria-label="Sales reports">
+                            <div className="dashboard-chart-card">
+                                <h2>Product sales</h2>
+                                <ProductSalesChart startDate={startDate} endDate={endDate} />
                             </div>
-                        </>
-                    )}
-
-
-                </div>
-                <>
-                    <ProductSalesChart />
-                </>
-                <>
-                    <UserSalesChart />
-                </>
-                <>
-                    <MonthlySalesChart />
-                </>
-
-            </div >
-        </ >
+                            <div className="dashboard-chart-card">
+                                <h2>Customer sales</h2>
+                                <UserSalesChart startDate={startDate} endDate={endDate} />
+                            </div>
+                            <div className="dashboard-chart-card dashboard-chart-wide">
+                                <h2>Monthly sales</h2>
+                                <MonthlySalesChart startDate={startDate} endDate={endDate} />
+                            </div>
+                        </section>
+                    </>
+                )}
+            </main>
+        </>
     )
 }
 

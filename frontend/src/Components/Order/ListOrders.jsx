@@ -1,13 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
-import axios from 'axios'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 // import { getToken } from '../Utils/helpers'
 import { useDispatch, useSelector } from 'react-redux'
-import { myOrders, clearErrors } from '../../actions/orderActions'
+import { myOrders } from '../../actions/orderActions'
 
 import {
 
@@ -53,37 +52,44 @@ const ListOrders = () => {
         {
             field: 'id',
             headerName: 'Order ID',
-            flex: 1,
+            flex: 2,
+            minWidth: 220,
             renderCell: (params) => <span style={{ wordBreak: 'break-all' }}>{params.value}</span>
         },
         {
             field: 'numOfItems',
             headerName: 'Num of Items',
             type: 'number',
-            width: 130,
+            flex: 1,
+            minWidth: 130,
             align: 'right',
             headerAlign: 'right'
         },
         {
             field: 'amount',
             headerName: 'Amount',
-            width: 120,
+            flex: 1,
+            minWidth: 130,
             align: 'right',
             headerAlign: 'right'
         },
         {
             field: 'status',
             headerName: 'Status',
-            width: 160,
+            flex: 1,
+            minWidth: 140,
             renderCell: (params) =>
-                (params.value && String(params.value).includes('Delivered'))
-                    ? <span style={{ color: 'green' }}>{params.value}</span>
-                    : <span style={{ color: 'red' }}>{params.value}</span>
+                (params.value === 'Completed' || params.value === 'Delivered')
+                    ? <span className="order-status order-status-complete">{params.value}</span>
+                    : params.value === 'Cancelled'
+                        ? <span className="order-status order-status-cancelled">{params.value}</span>
+                        : <span className="order-status order-status-progress">{params.value}</span>
         },
         {
             field: 'actions',
             headerName: 'Actions',
-            width: 120,
+            flex: 1,
+            minWidth: 120,
             sortable: false,
             filterable: false,
             renderCell: (params) => (
@@ -102,7 +108,7 @@ const ListOrders = () => {
     const rows = orders.map(order => ({
         id: order._id,
         numOfItems: order.orderItems.length,
-        amount: `$${order.totalPrice}`,
+        amount: `₱${Number(order.totalPrice).toFixed(2)}`,
         status: order.orderStatus || ''
     }));
     useEffect(() => {
@@ -119,25 +125,33 @@ const ListOrders = () => {
     return (
         <>
             <MetaData title={'My Orders'} />
-            <h1 className="my-5">My Orders</h1>
+            <main className="admin-page-content my-orders-page">
+                <header className="admin-page-heading">
+                    <div>
+                        <p className="admin-eyebrow">ORDER HISTORY</p>
+                        <h1>My Orders</h1>
+                        <p className="admin-page-subtitle">View your purchases and check their current status.</p>
+                    </div>
+                </header>
 
-
-
-
-            {loading ? <Loader /> : (
-                <div style={{ width: '100%' }}>
-                    <DataGrid
-                        rows={rows}
-                        columns={columns}
-
-                        pageSize={5}
-                        rowsPerPageOptions={[5, 10, 25]}
-                        disableSelectionOnClick
-                        getRowId={(row) => row.id}
-                        showToolbar
-                    />
-                </div>
-            )}
+                {loading ? <Loader /> : (
+                    <div className="admin-data-grid my-orders-grid">
+                        <DataGrid
+                            rows={rows}
+                            columns={columns}
+                            pageSizeOptions={[5, 10, 25]}
+                            initialState={{
+                                pagination: {
+                                    paginationModel: { pageSize: 10, page: 0 }
+                                }
+                            }}
+                            disableRowSelectionOnClick
+                            getRowId={(row) => row.id}
+                            showToolbar
+                        />
+                    </div>
+                )}
+            </main>
         </>
     )
 }
