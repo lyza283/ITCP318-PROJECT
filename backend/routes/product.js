@@ -12,6 +12,7 @@ const {
     getAdminProducts,
     createProductReview,
     getProductReviews,
+    getAllReviews,
     deleteReview,
     productSales,
 
@@ -29,6 +30,7 @@ router.delete('/admin/products', isAuthenticatedUser, authorizeRoles('admin'), d
 router.delete('/admin/product/:id', isAuthenticatedUser, authorizeRoles('admin'), deleteProduct);
 router.get('/admin/products', isAuthenticatedUser, authorizeRoles('admin'), getAdminProducts)
 router.put('/review', isAuthenticatedUser, createProductReview);
+router.get('/admin/reviews', isAuthenticatedUser, authorizeRoles('admin'), getAllReviews)
 router.get('/reviews', isAuthenticatedUser, authorizeRoles('admin'), getProductReviews)
 router.delete('/reviews', isAuthenticatedUser, authorizeRoles('admin'), deleteReview)
 router.get('/admin/product-sales', isAuthenticatedUser, authorizeRoles('admin'), productSales);

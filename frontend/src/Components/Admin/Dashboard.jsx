@@ -19,6 +19,7 @@ const Dashboard = () => {
         products: [],
         orders: [],
         users: [],
+        reviews: [],
     })
     const [loading, setLoading] = useState(true)
     const [startDate, setStartDate] = useState(thirtyDaysAgo)
@@ -30,13 +31,15 @@ const Dashboard = () => {
             adminApi.get('/admin/products'),
             adminApi.get('/admin/orders'),
             adminApi.get('/admin/users'),
+            adminApi.get('/admin/reviews'),
         ])
-            .then(([productsResponse, ordersResponse, usersResponse]) => {
+            .then(([productsResponse, ordersResponse, usersResponse, reviewsResponse]) => {
                 if (active) {
                     setDashboardData({
                         products: productsResponse.data.products,
                         orders: ordersResponse.data.orders,
                         users: usersResponse.data.users,
+                        reviews: reviewsResponse.data.reviews,
                     })
                 }
             })
@@ -61,6 +64,7 @@ const Dashboard = () => {
         { label: 'Products', value: dashboardData.products.length, icon: 'fa-product-hunt', to: '/admin/products' },
         { label: 'Orders', value: dashboardData.orders.length, icon: 'fa-shopping-basket', to: '/admin/orders' },
         { label: 'Users', value: dashboardData.users.length, icon: 'fa-users', to: '/admin/users' },
+        { label: 'Reviews', value: dashboardData.reviews.length, icon: 'fa-star', to: '/admin/reviews' },
         { label: 'Out of stock', value: outOfStock, icon: 'fa-exclamation-circle' },
     ]
 

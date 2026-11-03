@@ -398,32 +398,66 @@ exports.createProductReview = async (req, res, next) => {
     })
 }
 
-exports.getProductReviews = async (req, res, next) => {
-    const product = await Product.findById(req.query.id);
-    res.status(200).json({
+const formatReview = (product, review) => ({
+    _id: review._id,
+    productId: product._id,
+    productName: product.name,
+    user: review.user,
+    name: review.name,
+    rating: review.rating,
+    comment: review.comment,
+    verifiedPurchase: Boolean(review.verifiedPurchase)
+});
+
+exports.getAllReviews = async (req, res, next) => {
+    const products = await Product.find({ 'reviews.0': { $exists: true } }).select('name reviews');
+    const reviews = products.flatMap(product => product.reviews.map(review => formatReview(product, review)));
+    return res.status(200).json({
         success: true,
-        reviews: product.reviews
-    })
+        count: reviews.length,
+        reviews
+    });
+}
+
+exports.getProductReviews = async (req, res, next) => {
+    if (!mongoose.isValidObjectId(req.query.id)) {
+        return res.status(400).json({ success: false, message: 'Please enter a valid product ID.' });
+    }
+    const product = await Product.findById(req.query.id).select('name reviews');
+    if (!product) {
+        return res.status(404).json({ success: false, message: 'Product not found.' });
+    }
+    return res.status(200).json({
+        success: true,
+        reviews: product.reviews.map(review => formatReview(product, review))
+    });
 }
 
 exports.deleteReview = async (req, res, next) => {
-    console.log(req.query)
-    const product = await Product.findById(req.query.productId);
-    const reviews = product.reviews.filter(review => review._id.toString() !== req.query.id.toString());
-    const numOfReviews = reviews.length;
+    const { id, productId } = req.query;
+    if (!mongoose.isValidObjectId(productId) || !mongoose.isValidObjectId(id)) {
+        return res.status(400).json({ success: false, message: 'Invalid product or review ID.' });
+    }
+    const product = await Product.findById(productId);
+    if (!product) {
+        return res.status(404).json({ success: false, message: 'Product not found.' });
+    }
+    const reviews = product.reviews.filter(review => review._id.toString() !== id.toString());
+    if (reviews.length === product.reviews.length) {
+        return res.status(404).json({ success: false, message: 'Review not found.' });
+    }
 
     const ratings = reviews.length
         ? reviews.reduce((acc, item) => item.rating + acc, 0) / reviews.length
         : 0
 
-    await Product.findByIdAndUpdate(req.query.productId, {
+    await Product.findByIdAndUpdate(productId, {
         reviews,
         ratings,
-        numOfReviews
+        numOfReviews: reviews.length
     }, {
-        new: true,
-        runValidators: true,
-        useFindAndModify: false
+        returnDocument: 'after',
+        runValidators: true
     })
 
     return res.status(200).json({

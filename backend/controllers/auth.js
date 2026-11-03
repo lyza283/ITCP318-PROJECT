@@ -5,6 +5,9 @@ const sendEmail = require('../utils/sendEmail')
 const sendToken = require('../utils/jwtToken');
 const { OAuth2Client } = require('google-auth-library');
 
+// Unang URL sa FRONTEND_ORIGIN ang gagamitin sa mga link sa email at default avatar
+const frontendUrl = () => (process.env.FRONTEND_ORIGIN || 'http://localhost:5173').split(',')[0].trim().replace(/\/$/, '');
+
 exports.registerUser = async (req, res, next) => {
     const { name, email, password, avatar } = req.body;
     if (!process.env.JWT_SECRET) {
@@ -128,7 +131,7 @@ exports.googleLogin = async (req, res) => {
                 googleId: payload.sub,
                 avatar: {
                     public_id: 'google',
-                    url: payload.picture || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/images/default_avatar.jpg`
+                    url: payload.picture || `${frontendUrl()}/images/default_avatar.jpg`
                 }
             });
         }
@@ -179,7 +182,7 @@ exports.forgotPassword = async (req, res, next) => {
     const resetToken = user.getResetPasswordToken();
     await user.save({ validateBeforeSave: false });
     // Create reset password url
-    const resetUrl = `${req.protocol}://localhost:5173/password/reset/${resetToken}`;
+    const resetUrl = `${frontendUrl()}/password/reset/${resetToken}`;
     const message = `Your password reset token is as follow:\n\n${resetUrl}\n\nIf you have not requested this email, then ignore it.`
     try {
         await sendEmail({
@@ -367,9 +370,10 @@ exports.updateUser = async (req, res, next) => {
 }
 
 exports.logout = async (req, res, next) => {
+    // Dapat pareho ang flags ng cookie nung login para mabura talaga sa production
     res.cookie('token', null, {
         expires: new Date(Date.now()),
-        httpOnly: true
+        ...sendToken.cookieFlags()
     })
 
     return res.status(200).json({

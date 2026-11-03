@@ -1,40 +1,51 @@
-import { useState } from 'react'
-
+import { useCallback, useEffect, useState } from 'react'
 
 import MetaData from '../Layout/MetaData'
-// import Toast from '../Layout/Toast'
+import Loader from '../Layout/Loader'
 import Swal from 'sweetalert2'
 import { errMsg, successMsg } from '../Utils/helpers'
 import adminApi from './adminApi'
 import { DataGrid, } from '@mui/x-data-grid'
 
-
-
 const ProductReviews = () => {
     const [productId, setProductId] = useState('')
+    const [activeProductId, setActiveProductId] = useState('')
     const [listReviews, setListReviews] = useState([])
+    const [loading, setLoading] = useState(true)
 
-    const getProductReviews = async (id) => {
+    // Loads every review by default, or only one product's reviews when a product ID is given.
+    const loadReviews = useCallback(async (id = '') => {
+        setLoading(true)
         try {
-            const { data } = await adminApi.get('/reviews', { params: { id } })
-            setListReviews(data.reviews)
+            const { data } = id
+                ? await adminApi.get('/reviews', { params: { id } })
+                : await adminApi.get('/admin/reviews')
+            setListReviews(data.reviews || [])
         } catch (error) {
+            setListReviews([])
             errMsg(error.response?.data?.message || error.message || 'Unable to load reviews.')
+        } finally {
+            setLoading(false)
         }
-    }
-    const deleteReview = async (id, productId) => {
+    }, [])
+
+    useEffect(() => {
+        loadReviews()
+    }, [loadReviews])
+
+    const deleteReview = async (id, reviewProductId) => {
         try {
-            const { data } = await adminApi.delete('/reviews', { params: { id, productId } })
+            const { data } = await adminApi.delete('/reviews', { params: { id, productId: reviewProductId } })
             if (data.success) {
                 successMsg('Review deleted successfully')
-                await getProductReviews(productId)
+                await loadReviews(activeProductId)
             }
         } catch (error) {
             errMsg(error.response?.data?.message || error.message || 'Unable to delete review.')
         }
     }
 
-    const deleteReviewHandler = (id) => {
+    const deleteReviewHandler = (id, reviewProductId) => {
         Swal.fire({
             title: 'Delete Review',
             icon: 'info',
@@ -43,71 +54,86 @@ const ProductReviews = () => {
             showCancelButton: true
         }).then((result) => {
             if (result.isConfirmed) {
-                deleteReview(id, productId)
+                deleteReview(id, reviewProductId)
             }
         })
-
     }
+
     const submitHandler = (e) => {
         e.preventDefault();
-        getProductReviews(productId)
+        const id = productId.trim()
+        setActiveProductId(id)
+        loadReviews(id)
+    }
+
+    const showAllHandler = () => {
+        setProductId('')
+        setActiveProductId('')
+        loadReviews()
     }
 
     const columns = [
         {
-            field: 'id',
-            headerName: 'Review ID',
+            field: 'productName',
+            headerName: 'Product',
             flex: 1,
-            renderCell: (params) => <span style={{ wordBreak: 'break-all' }}>{params.value}</span>
+            minWidth: 160,
         },
         {
             field: 'rating',
             headerName: 'Rating',
-
-            width: 130,
-            align: 'right',
-            headerAlign: 'right'
+            width: 100,
+            type: 'number',
         },
         {
             field: 'comment',
             headerName: 'Comment',
-            width: 120,
-            align: 'right',
-            headerAlign: 'right'
+            flex: 2,
+            minWidth: 220,
         },
         {
-            field: 'user',
-            headerName: 'User',
-            width: 120,
-            align: 'right',
-            headerAlign: 'right'
+            field: 'name',
+            headerName: 'Customer',
+            width: 150,
         },
-
+        {
+            field: 'verifiedPurchase',
+            headerName: 'Verified',
+            width: 100,
+            renderCell: (params) => (params.value ? 'Yes' : 'No')
+        },
+        {
+            field: 'id',
+            headerName: 'Review ID',
+            width: 220,
+            renderCell: (params) => <span style={{ wordBreak: 'break-all' }}>{params.value}</span>
+        },
         {
             field: 'actions',
             headerName: 'Actions',
-            width: 120,
+            width: 100,
             sortable: false,
             filterable: false,
             renderCell: (params) => (
-
-                <>
-                    <button className="btn btn-danger py-1 px-2 ml-2" onClick={() => deleteReviewHandler(params.id)}>
-                        <i className="fa fa-trash"></i>
-                    </button>
-                </>
+                <button
+                    className="btn btn-danger py-1 px-2"
+                    onClick={() => deleteReviewHandler(params.row.id, params.row.productId)}
+                >
+                    <i className="fa fa-trash"></i>
+                </button>
             )
         }
     ];
 
     const rows = listReviews.map(review => ({
         id: review._id,
+        productId: review.productId,
+        productName: review.productName,
         comment: review.comment,
         rating: review.rating,
-        user: review.user,
+        name: review.name,
+        verifiedPurchase: review.verifiedPurchase,
     }));
-
-
 
     return (
         <>
@@ -117,7 +143,7 @@ const ProductReviews = () => {
                 <div className="review-search-panel">
                     <form onSubmit={submitHandler}>
                         <div className="form-group">
-                            <label htmlFor="productId_field">Enter Product ID</label>
+                            <label htmlFor="productId_field">Filter by Product ID (optional)</label>
                             <input
                                 type="text"
                                 id="productId_field"
@@ -133,23 +159,29 @@ const ProductReviews = () => {
                         >
                             SEARCH REVIEWS
                         </button>
+                        {activeProductId && (
+                            <button type="button" className="btn btn-light btn-block py-2 mt-2" onClick={showAllHandler}>
+                                SHOW ALL REVIEWS
+                            </button>
+                        )}
                     </form>
                 </div>
-                {listReviews && listReviews.length > 0 ? (
+                {loading ? <Loader /> : rows.length > 0 ? (
                     <div className="admin-data-grid">
                         <DataGrid
                             rows={rows}
                             columns={columns}
-
-                            pageSize={5}
-                            rowsPerPageOptions={[5, 10, 25]}
-                            disableSelectionOnClick
+                            initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
+                            pageSizeOptions={[5, 10, 25]}
+                            disableRowSelectionOnClick
                             getRowId={(row) => row.id}
                             showToolbar
                         />
                     </div>
                 ) : (
-                    <p className="admin-empty-state">Search by product ID to view reviews.</p>
+                    <p className="admin-empty-state">
+                        {activeProductId ? 'No reviews found for this product.' : 'No reviews have been submitted yet.'}
+                    </p>
                 )}
             </main>
         </>

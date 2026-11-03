@@ -7,14 +7,22 @@ const products = require('./routes/product');
 const auth = require('./routes/auth');
 const order = require('./routes/order');
 
-// app.use(cors());
+// Frontend URL galing sa env (puwede maraming URL na may comma), localhost lang kapag dev
+const allowedOrigins = (process.env.FRONTEND_ORIGIN || 'http://localhost:5173')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
 app.use(cors({
-    origin: "http://localhost:5173",
+    origin: allowedOrigins,
     credentials: true
 }));
 app.use(cookieParser());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
+// Pang-gising sa free server bago mag-demo, walang DB call
+app.get('/api/v1/health', (req, res) => res.status(200).json({ success: true }));
+
 app.use('/api/v1', products);
 app.use('/api/v1', auth);
 app.use('/api/v1', order);

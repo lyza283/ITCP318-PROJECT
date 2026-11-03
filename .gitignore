@@ -17,6 +17,10 @@
 # misc
 .DS_Store
 /backend/config/.env
+.env
+.env.*
+!.env.example
+**/dist/
 .env.local
 .env.development.local
 .env.test.local
