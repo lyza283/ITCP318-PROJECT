@@ -1,25 +1,22 @@
-import React, { useState, } from 'react'
+import { useState } from 'react'
 
 import MetaData from '../Layout/MetaData'
-import axios from 'axios'
 import { toast } from 'react-toastify';
 
 import 'react-toastify/dist/ReactToastify.css';
-import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from 'react-redux'
 import { forgotPassword } from '../../actions/userActions';
+import { isFirebaseConfigured, sendFirebasePasswordReset } from '../../Utils/firebaseAuth'
 
 
 
 const ForgotPassword = () => {
     const dispatch = useDispatch();
-    const { error, loading, message } = useSelector(state => state.forgotPassword)
+    const { loading } = useSelector(state => state.forgotPassword)
 
 
     const [email, setEmail] = useState('')
     // const [loading, setLoading] = useState('')
-
-    const navigate = useNavigate()
 
     // const forgotPassword = async (formData) => {
     //     const config = {
@@ -51,6 +48,19 @@ const ForgotPassword = () => {
         dispatch(forgotPassword(formData))
     }
 
+    const firebaseResetHandler = async () => {
+        if (!email.trim()) {
+            toast.error('Enter your email address first.')
+            return
+        }
+        try {
+            await sendFirebasePasswordReset(email.trim())
+            toast.success('Firebase password reset email sent.')
+        } catch (firebaseError) {
+            toast.error(firebaseError.message || 'Unable to send the Firebase password reset email.')
+        }
+    }
+
     return (
         <>
             <MetaData title={'Forgot Password'} />
@@ -76,6 +86,15 @@ const ForgotPassword = () => {
                             disabled={loading ? true : false} >
                             Send Email
                         </button>
+                        {isFirebaseConfigured && (
+                            <button
+                                type="button"
+                                className="btn btn-outline-dark btn-block py-3 mt-2"
+                                onClick={firebaseResetHandler}
+                            >
+                                Reset Firebase Password
+                            </button>
+                        )}
 
                     </form>
                 </div>

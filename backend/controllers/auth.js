@@ -1,9 +1,11 @@
 const User = require('../models/user');
+const { getPagination, paginationMetadata } = require('../utils/pagination');
 const crypto = require('crypto')
 const cloudinary = require('cloudinary')
 const sendEmail = require('../utils/sendEmail')
 const sendToken = require('../utils/jwtToken');
 const { OAuth2Client } = require('google-auth-library');
+const getFirebaseAdminAuth = require('../utils/firebaseAdmin');
 
 // Unang URL sa FRONTEND_ORIGIN ang gagamitin sa mga link sa email at default avatar
 const frontendUrl = () => (process.env.FRONTEND_ORIGIN || 'http://localhost:5173').split(',')[0].trim().replace(/\/$/, '');
@@ -138,6 +140,78 @@ exports.googleLogin = async (req, res) => {
     }
 
     return sendToken(user, 200, res);
+};
+
+exports.firebaseLogin = async (req, res) => {
+    let firebaseAuth;
+    try {
+        firebaseAuth = getFirebaseAdminAuth();
+    } catch (error) {
+        console.error('Firebase Admin initialization failed:', error.message);
+        return res.status(503).json({
+            message: 'Firebase Auth server credentials are invalid. Check the Firebase Admin settings.'
+        });
+    }
+    if (!firebaseAuth) {
+        return res.status(503).json({
+            message: 'Firebase Auth is not configured. Add the Admin SDK settings to backend/config/.env.'
+        });
+    }
+    if (!process.env.JWT_SECRET) {
+        return res.status(503).json({ message: 'Authentication is not configured on the server.' });
+    }
+
+    const idToken = req.body?.idToken;
+    if (typeof idToken !== 'string' || !idToken) {
+        return res.status(400).json({ message: 'Firebase did not provide a valid sign-in token.' });
+    }
+
+    let identity;
+    try {
+        identity = await firebaseAuth.verifyIdToken(idToken);
+    } catch (error) {
+        console.error('Firebase ID token verification failed:', error.message);
+        return res.status(401).json({ message: 'Firebase sign-in could not be verified. Please try again.' });
+    }
+    const email = identity.email?.trim().toLowerCase();
+    if (!identity.uid || !email || identity.email_verified !== true) {
+        return res.status(401).json({
+            message: 'Verify your Firebase email before signing in to GuhitSpace.'
+        });
+    }
+
+    try {
+        let user = await User.findOne({ firebaseUid: identity.uid });
+        if (!user) {
+            user = await User.findOne({ email });
+            if (user) {
+                user.firebaseUid = identity.uid;
+                await user.save();
+            } else {
+                user = await User.create({
+                    firebaseUid: identity.uid,
+                    name: identity.name || email.split('@')[0],
+                    email,
+                    avatar: {
+                        public_id: 'firebase',
+                        url: identity.picture || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/images/guhit_space_logo.png`
+                    }
+                });
+            }
+        }
+
+        return sendToken(user, 200, res);
+    } catch (error) {
+        if (error.code === 11000) {
+            return res.status(409).json({
+                message: 'This Firebase account is already linked to a different GuhitSpace account.'
+            });
+        }
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ message: error.message });
+        }
+        throw error;
+    }
 };
 
 exports.loginUser = async (req, res, next) => {
@@ -292,7 +366,11 @@ exports.updateProfile = async (req, res, next) => {
 }
 
 exports.updatePassword = async (req, res, next) => {
-    console.log(req.body.password)
+    if (req.user.firebaseUid) {
+        return res.status(400).json({
+            message: 'This account uses Firebase Auth. Reset your password from the Firebase sign-in option.'
+        });
+    }
     const user = await User.findById(req.user.id).select('+password');
     // Check previous user password
     const isMatched = await user.comparePassword(req.body.oldPassword)
@@ -313,10 +391,15 @@ exports.updatePassword = async (req, res, next) => {
 }
 
 exports.allUsers = async (req, res, next) => {
-    const users = await User.find();
+    const { page, limit, skip } = getPagination(req.query);
+    const [users, totalCount] = await Promise.all([
+        User.find().sort({ _id: 1 }).skip(skip).limit(limit),
+        User.countDocuments()
+    ]);
     res.status(200).json({
         success: true,
-        users
+        users,
+        ...paginationMetadata(totalCount, page, limit)
     })
 }
 
@@ -328,9 +411,43 @@ exports.deleteUser = async (req, res, next) => {
         // return next(new ErrorHandler(`User does not found with id: ${req.params.id}`))
     }
 
+    if (user.firebaseUid) {
+        if (!process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PRIVATE_KEY) {
+            return res.status(503).json({
+                message: 'Firebase Admin credentials are required to delete this Firebase account.'
+            });
+        }
+        let firebaseAuth;
+        try {
+            firebaseAuth = getFirebaseAdminAuth();
+        } catch (error) {
+            console.error('Firebase Admin initialization failed during account deletion:', error.message);
+            return res.status(503).json({
+                message: 'Firebase Auth server credentials are invalid; the account was not deleted.'
+            });
+        }
+        if (!firebaseAuth) {
+            return res.status(503).json({
+                message: 'Firebase Auth is not configured; the account was not deleted.'
+            });
+        }
+        try {
+            await firebaseAuth.deleteUser(user.firebaseUid);
+        } catch (error) {
+            if (error.code !== 'auth/user-not-found') {
+                console.error('Firebase account deletion failed:', error.message);
+                return res.status(502).json({
+                    message: 'Could not delete the Firebase account; the account was not deleted.'
+                });
+            }
+        }
+    }
+
     // Remove avatar from cloudinary
     const image_id = user.avatar.public_id;
-    await cloudinary.v2.uploader.destroy(image_id);
+    if (image_id && !['google', 'firebase'].includes(image_id)) {
+        await cloudinary.v2.uploader.destroy(image_id);
+    }
     await User.findByIdAndDelete(req.params.id);
     return res.status(200).json({
         success: true,

@@ -5,6 +5,7 @@ import { toast } from 'react-toastify'
 // import axios from 'axios'
 import { useDispatch, useSelector } from 'react-redux'
 import { register, clearErrors } from '../../actions/userActions'
+import { isFirebaseConfigured, registerWithFirebaseEmail } from '../../Utils/firebaseAuth'
 
 
 const Register = () => {
@@ -55,6 +56,19 @@ const Register = () => {
         formData.set('avatar', avatar);
 
         dispatch(register(formData))
+    }
+
+    const firebaseRegisterHandler = async () => {
+        if (name.trim().length < 2 || !email.trim() || password.length < 6) {
+            toast.error('Enter your name, a valid email, and a password with at least 6 characters.')
+            return
+        }
+        try {
+            await registerWithFirebaseEmail(name.trim(), email.trim(), password)
+            toast.success('Firebase account created. Verify your email before signing in.')
+        } catch (firebaseError) {
+            toast.error(firebaseError.message || 'Firebase registration failed. Please try again.')
+        }
     }
 
     const onChange = e => {
@@ -190,6 +204,16 @@ const Register = () => {
                         >
                             {loading ? 'REGISTERING...' : 'REGISTER'}
                         </button>
+                        {isFirebaseConfigured && (
+                            <button
+                                type="button"
+                                className="btn btn-outline-dark btn-block py-3 mt-2"
+                                disabled={loading}
+                                onClick={firebaseRegisterHandler}
+                            >
+                                CREATE FIREBASE ACCOUNT
+                            </button>
+                        )}
                     </form>
                 </div>
             </div>

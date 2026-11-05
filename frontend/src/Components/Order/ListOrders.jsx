@@ -1,24 +1,44 @@
-import { useEffect } from 'react'
+import { useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 // import { getToken } from '../Utils/helpers'
-import { useDispatch, useSelector } from 'react-redux'
-import { myOrders } from '../../actions/orderActions'
+import axios from 'axios'
+import InfiniteDataGrid from '../Utils/InfiniteDataGrid'
+import InfiniteScrollSentinel from '../Utils/InfiniteScrollSentinel'
+import ListPagination from '../Utils/ListPagination'
+import useInfiniteRecords from '../Utils/useInfiniteRecords'
+import { PAGE_SIZE } from '../Utils/pagination'
 
-import {
-
-    Button
-} from '@mui/material'
-
-
-import { DataGrid, } from '@mui/x-data-grid'
+import { Button } from '@mui/material'
 
 const ListOrders = () => {
-    const dispatch = useDispatch();
-    const { loading, error, orders } = useSelector(state => state.myOrders);
+    const fetchPage = useCallback(async page => {
+        const { data } = await axios.get(`${import.meta.env.VITE_API}/orders/me`, {
+            params: { page, limit: PAGE_SIZE },
+            withCredentials: true
+        })
+        return data
+    }, [])
+    const onLoadError = useCallback(error => {
+        toast.error(error.response?.data?.message || error.message || 'Unable to load orders.', {
+            position: 'bottom-right'
+        })
+    }, [])
+    const {
+        records: orders,
+        loading,
+        loadingMore,
+        hasMore,
+        failed,
+        currentPage,
+        totalCount,
+        pageSize,
+        loadMore,
+        goToPage
+    } = useInfiniteRecords(fetchPage, 'orders', true, onLoadError)
     // const [loading, setLoading] = useState(true)
     // const [error, setError] = useState('')
     // const [myOrdersList, setMyOrdersList] = useState([])
@@ -111,17 +131,6 @@ const ListOrders = () => {
         amount: `₱${Number(order.totalPrice).toFixed(2)}`,
         status: order.orderStatus || ''
     }));
-    useEffect(() => {
-        dispatch(myOrders());
-        if (error) {
-            toast.error(error, {
-                position: 'bottom-right'
-            });
-        }
-    }, [error, dispatch])
-
-
-
     return (
         <>
             <MetaData title={'My Orders'} />
@@ -136,20 +145,36 @@ const ListOrders = () => {
 
                 {loading ? <Loader /> : (
                     <div className="admin-data-grid my-orders-grid">
-                        <DataGrid
+                        <InfiniteDataGrid
                             rows={rows}
                             columns={columns}
-                            pageSizeOptions={[5, 10, 25]}
-                            initialState={{
-                                pagination: {
-                                    paginationModel: { pageSize: 10, page: 0 }
-                                }
-                            }}
+                            hasMore={hasMore}
+                            loadingMore={loadingMore}
+                            onLoadMore={loadMore}
                             disableRowSelectionOnClick
                             getRowId={(row) => row.id}
                             showToolbar
                         />
                     </div>
+                )}
+                {!loading && (
+                    <ListPagination
+                        currentPage={currentPage}
+                        totalCount={totalCount}
+                        pageSize={pageSize}
+                        disabled={loading}
+                        onChange={goToPage}
+                    />
+                )}
+                {!loading && (
+                    <InfiniteScrollSentinel
+                        hasMore={hasMore}
+                        loading={false}
+                        loadingMore={loadingMore}
+                        failed={failed}
+                        observeWindowScroll={false}
+                        onLoadMore={loadMore}
+                    />
                 )}
             </main>
         </>

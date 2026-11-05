@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { signOutFirebase } from '../Utils/firebaseAuth'
 import {
     LOGIN_REQUEST,
     LOGIN_SUCCESS,
@@ -110,6 +111,30 @@ export const loginWithGoogle = (credential) => async (dispatch) => {
     }
 }
 
+export const loginWithFirebase = (firebaseUser) => async (dispatch) => {
+    try {
+        dispatch({ type: LOGIN_REQUEST })
+        if (!firebaseUser.emailVerified) {
+            throw new Error('Please verify your Firebase email before signing in.')
+        }
+        const idToken = await firebaseUser.getIdToken()
+        const { data } = await axios.post(`${import.meta.env.VITE_API}/auth/firebase`, { idToken }, {
+            withCredentials: true
+        })
+        dispatch({
+            type: LOGIN_SUCCESS,
+            payload: data.user
+        })
+        return true
+    } catch (error) {
+        dispatch({
+            type: LOGIN_FAIL,
+            payload: error.response?.data?.message || error.message || 'Firebase sign-in failed. Please try again.'
+        })
+        return false
+    }
+}
+
 export const logout = () => async (dispatch) => {
     try {
         const config = {
@@ -119,13 +144,14 @@ export const logout = () => async (dispatch) => {
             withCredentials: true,
         }
         await axios.get(`${import.meta.env.VITE_API}/logout`, config)
+        await signOutFirebase()
         dispatch({
             type: LOGOUT_SUCCESS,
         })
     } catch (error) {
         dispatch({
             type: LOGOUT_FAIL,
-            payload: error.response.data.message
+            payload: error.response?.data?.message || error.message || 'Unable to log out. Please try again.'
         })
     }
 }

@@ -1,17 +1,18 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useCallback } from 'react'
+import { Link } from 'react-router-dom'
 
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { DataGrid, } from '@mui/x-data-grid'
 import adminApi from './adminApi'
+import InfiniteDataGrid from '../Utils/InfiniteDataGrid'
+import InfiniteScrollSentinel from '../Utils/InfiniteScrollSentinel'
+import ListPagination from '../Utils/ListPagination'
+import useInfiniteRecords from '../Utils/useInfiniteRecords'
+import { PAGE_SIZE } from '../Utils/pagination'
 
 const OrdersList = () => {
-    let navigate = useNavigate();
-    const [loading, setLoading] = useState(true)
-    const [allOrders, setAllOrders] = useState([])
     const errMsg = (message = '') => toast.error(message, {
         position: 'bottom-right'
     });
@@ -19,34 +20,40 @@ const OrdersList = () => {
         position: 'bottom-right'
     });
 
+    const fetchPage = useCallback(async page => {
+        const { data } = await adminApi.get('/admin/orders', { params: { page, limit: PAGE_SIZE } })
+        return data
+    }, [])
+    const onLoadError = useCallback(error => {
+        toast.error(error.response?.data?.message || error.message || 'Unable to load orders.', {
+            position: 'bottom-right'
+        })
+    }, [])
+    const {
+        records: allOrders,
+        loading,
+        loadingMore,
+        hasMore,
+        failed,
+        currentPage,
+        totalCount,
+        pageSize,
+        loadMore,
+        goToPage,
+        removeRecord
+    } = useInfiniteRecords(fetchPage, 'orders', true, onLoadError)
+
     const deleteOrder = async (id) => {
         try {
             const { data } = await adminApi.delete(`/admin/order/${id}`)
             if (data.success) {
+                removeRecord(id, order => order._id)
                 successMsg('Order deleted successfully')
-                navigate('/admin/orders')
             }
         } catch (error) {
             errMsg(error.response?.data?.message || error.message || 'Unable to delete order.')
         }
     }
-    useEffect(() => {
-        let active = true
-        adminApi.get('/admin/orders')
-            .then(({ data }) => {
-                if (active) setAllOrders(data.orders)
-            })
-            .catch(error => {
-                if (active) errMsg(error.response?.data?.message || error.message || 'Unable to load orders.')
-            })
-            .finally(() => {
-                if (active) setLoading(false)
-            })
-
-        return () => {
-            active = false
-        }
-    }, [])
 
     const deleteOrderHandler = (id) => {
         deleteOrder(id)
@@ -111,15 +118,36 @@ const OrdersList = () => {
                 <h1 className="admin-page-title">All Orders</h1>
                 {loading ? <Loader /> : (
                     <div className="admin-data-grid">
-                        <DataGrid
+                        <InfiniteDataGrid
                             rows={rows}
                             columns={columns}
-                            pageSizeOptions={[5, 10, 25]}
+                            hasMore={hasMore}
+                            loadingMore={loadingMore}
+                            onLoadMore={loadMore}
                             disableSelectionOnClick
                             getRowId={(row) => row.id}
                             showToolbar
                         />
                     </div>
+                )}
+                {!loading && (
+                    <ListPagination
+                        currentPage={currentPage}
+                        totalCount={totalCount}
+                        pageSize={pageSize}
+                        disabled={loading}
+                        onChange={goToPage}
+                    />
+                )}
+                {!loading && (
+                    <InfiniteScrollSentinel
+                        hasMore={hasMore}
+                        loading={false}
+                        loadingMore={loadingMore}
+                        failed={failed}
+                        observeWindowScroll={false}
+                        onLoadMore={loadMore}
+                    />
                 )}
             </main>
         </>

@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const sendEmail = require('../utils/sendEmail');
 const createReceiptPdf = require('../utils/orderReceipt');
 const { parseDateRange, completedSalesPipeline } = require('../utils/salesAnalytics');
+const { getPagination, paginationMetadata } = require('../utils/pagination');
 
 const ORDER_STATUSES = ['Pending', 'Processing', 'Shipped', 'Completed', 'Delivered', 'Cancelled'];
 const STATUS_TRANSITIONS = {
@@ -101,8 +102,17 @@ exports.newOrder = async (req, res) => {
 };
 
 exports.myOrders = async (req, res) => {
-    const orders = await Order.find({ user: req.user.id }).sort({ createdAt: -1 });
-    return res.status(200).json({ success: true, orders });
+    const { page, limit, skip } = getPagination(req.query);
+    const filter = { user: req.user.id };
+    const [orders, totalCount] = await Promise.all([
+        Order.find(filter).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit),
+        Order.countDocuments(filter)
+    ]);
+    return res.status(200).json({
+        success: true,
+        orders,
+        ...paginationMetadata(totalCount, page, limit)
+    });
 };
 
 exports.getSingleOrder = async (req, res) => {
@@ -134,9 +144,19 @@ exports.downloadReceipt = async (req, res) => {
 };
 
 exports.allOrders = async (req, res) => {
-    const orders = await Order.find().populate('user', 'name email').sort({ createdAt: -1 });
-    const totalAmount = roundCurrency(orders.reduce((sum, order) => sum + order.totalPrice, 0));
-    return res.status(200).json({ success: true, totalAmount, orders });
+    const { page, limit, skip } = getPagination(req.query);
+    const [orders, totalCount, totals] = await Promise.all([
+        Order.find().populate('user', 'name email').sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit),
+        Order.countDocuments(),
+        Order.aggregate([{ $group: { _id: null, total: { $sum: '$totalPrice' } } }])
+    ]);
+    const totalAmount = roundCurrency(totals[0]?.total || 0);
+    return res.status(200).json({
+        success: true,
+        totalAmount,
+        orders,
+        ...paginationMetadata(totalCount, page, limit)
+    });
 };
 
 exports.deleteOrder = async (req, res) => {

@@ -1,59 +1,54 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { DataGrid } from '@mui/x-data-grid'
 
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
 import adminApi from './adminApi'
 import { toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
+import InfiniteDataGrid from '../Utils/InfiniteDataGrid'
+import InfiniteScrollSentinel from '../Utils/InfiniteScrollSentinel'
+import ListPagination from '../Utils/ListPagination'
+import useInfiniteRecords from '../Utils/useInfiniteRecords'
+import { PAGE_SIZE } from '../Utils/pagination'
 
 const ProductsList = () => {
-    const [products, setProducts] = useState([])
-    const [loading, setLoading] = useState(true)
     const [selectedIds, setSelectedIds] = useState([])
     const [deleting, setDeleting] = useState(false)
 
-    const loadProducts = async () => {
-        setLoading(true)
-        try {
-            const { data } = await adminApi.get('/admin/products')
-            setProducts(data.products)
-            setSelectedIds([])
-        } catch (error) {
-            toast.error(error.response?.data?.message || error.message || 'Unable to load products.', {
-                position: 'bottom-right'
-            })
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    useEffect(() => {
-        let active = true
-        adminApi.get('/admin/products')
-            .then(({ data }) => {
-                if (active) setProducts(data.products)
-            })
-            .catch(error => {
-                if (active) {
-                    toast.error(error.response?.data?.message || error.message || 'Unable to load products.', {
-                        position: 'bottom-right'
-                    })
-                }
-            })
-            .finally(() => {
-                if (active) setLoading(false)
-            })
-        return () => {
-            active = false
-        }
+    const fetchPage = useCallback(async page => {
+        const { data } = await adminApi.get('/admin/products', { params: { page, limit: PAGE_SIZE } })
+        return data
     }, [])
+    const onLoadError = useCallback(error => {
+        toast.error(error.response?.data?.message || error.message || 'Unable to load products.', {
+            position: 'bottom-right'
+        })
+    }, [])
+    const {
+        records: products,
+        loading,
+        loadingMore,
+        hasMore,
+        failed,
+        currentPage,
+        totalCount,
+        pageSize,
+        loadMore,
+        goToPage,
+        reload,
+        removeRecord
+    } = useInfiniteRecords(fetchPage, 'products', true, onLoadError)
+
+    const loadProducts = async () => {
+        const loaded = await reload()
+        if (loaded) setSelectedIds([])
+    }
 
     const deleteProduct = async (id) => {
         try {
             const { data } = await adminApi.delete(`/admin/product/${id}`)
-            setProducts(current => current.filter(product => product._id !== id))
+            removeRecord(id)
             setSelectedIds(current => current.filter(selectedId => selectedId !== id))
             toast.success('Product deleted successfully.', { position: 'bottom-right' })
             if (data.imageCleanupWarning) {
@@ -75,7 +70,7 @@ const ProductsList = () => {
         setDeleting(true)
         try {
             const { data } = await adminApi.delete('/admin/products', { data: { ids: selectedIds } })
-            setProducts(current => current.filter(product => !selectedIds.includes(product._id)))
+            selectedIds.forEach(id => removeRecord(id))
             setSelectedIds([])
             toast.success(`${data.deletedCount} product(s) deleted.`, { position: 'bottom-right' })
             if (data.imageCleanupWarning) {
@@ -90,7 +85,7 @@ const ProductsList = () => {
                 )
                 const deletedIds = selectedIds.filter((_, index) => results[index].status === 'fulfilled')
                 const failedCount = results.length - deletedIds.length
-                setProducts(current => current.filter(product => !deletedIds.includes(product._id)))
+                deletedIds.forEach(id => removeRecord(id))
                 setSelectedIds(current => current.filter(id => !deletedIds.includes(id)))
 
                 if (failedCount === 0) {
@@ -215,16 +210,32 @@ const ProductsList = () => {
                             </button>
                         </div>
                         <div className="admin-data-grid">
-                            <DataGrid
+                            <InfiniteDataGrid
                                 rows={rows}
                                 columns={columns}
-                                pageSize={10}
-                                rowsPerPageOptions={[10, 25, 50]}
+                                hasMore={hasMore}
+                                loadingMore={loadingMore}
+                                onLoadMore={loadMore}
                                 disableSelectionOnClick
                                 getRowId={(row) => row.id}
                                 showToolbar
                             />
                         </div>
+                        <ListPagination
+                            currentPage={currentPage}
+                            totalCount={totalCount}
+                            pageSize={pageSize}
+                            disabled={loading}
+                            onChange={goToPage}
+                        />
+                        <InfiniteScrollSentinel
+                            hasMore={hasMore}
+                            loading={false}
+                            loadingMore={loadingMore}
+                            failed={failed}
+                            observeWindowScroll={false}
+                            onLoadMore={loadMore}
+                        />
                     </>
                 )}
             </main>

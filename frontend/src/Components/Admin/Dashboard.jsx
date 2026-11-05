@@ -16,10 +16,11 @@ const thirtyDaysAgo = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOStrin
 const Dashboard = () => {
 
     const [dashboardData, setDashboardData] = useState({
-        products: [],
-        orders: [],
-        users: [],
-        reviews: [],
+        productsCount: 0,
+        ordersCount: 0,
+        usersCount: 0,
+        reviewsCount: 0,
+        outOfStockCount: 0,
     })
     const [loading, setLoading] = useState(true)
     const [startDate, setStartDate] = useState(thirtyDaysAgo)
@@ -36,10 +37,11 @@ const Dashboard = () => {
             .then(([productsResponse, ordersResponse, usersResponse, reviewsResponse]) => {
                 if (active) {
                     setDashboardData({
-                        products: productsResponse.data.products,
-                        orders: ordersResponse.data.orders,
-                        users: usersResponse.data.users,
-                        reviews: reviewsResponse.data.reviews,
+                        productsCount: productsResponse.data.totalCount,
+                        ordersCount: ordersResponse.data.totalCount,
+                        usersCount: usersResponse.data.totalCount,
+                        reviewsCount: reviewsResponse.data.totalCount,
+                        outOfStockCount: productsResponse.data.outOfStockCount,
                     })
                 }
             })
@@ -59,13 +61,12 @@ const Dashboard = () => {
         }
     }, [])
 
-    const outOfStock = dashboardData.products.filter(product => product.stock === 0).length
     const stats = [
-        { label: 'Products', value: dashboardData.products.length, icon: 'fa-product-hunt', to: '/admin/products' },
-        { label: 'Orders', value: dashboardData.orders.length, icon: 'fa-shopping-basket', to: '/admin/orders' },
-        { label: 'Users', value: dashboardData.users.length, icon: 'fa-users', to: '/admin/users' },
-        { label: 'Reviews', value: dashboardData.reviews.length, icon: 'fa-star', to: '/admin/reviews' },
-        { label: 'Out of stock', value: outOfStock, icon: 'fa-exclamation-circle' },
+        { label: 'Products', value: dashboardData.productsCount, icon: 'fa-product-hunt', to: '/admin/products' },
+        { label: 'Orders', value: dashboardData.ordersCount, icon: 'fa-shopping-basket', to: '/admin/orders' },
+        { label: 'Users', value: dashboardData.usersCount, icon: 'fa-users', to: '/admin/users' },
+        { label: 'Reviews', value: dashboardData.reviewsCount, icon: 'fa-star', to: '/admin/reviews' },
+        { label: 'Out of stock', value: dashboardData.outOfStockCount, icon: 'fa-exclamation-circle' },
     ]
 
     return (

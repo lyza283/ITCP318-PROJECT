@@ -1,44 +1,52 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import MetaData from '../Layout/MetaData'
 import Loader from '../Layout/Loader'
 import Swal from 'sweetalert2'
 import { errMsg, successMsg } from '../Utils/helpers'
 import adminApi from './adminApi'
-import { DataGrid, } from '@mui/x-data-grid'
+import InfiniteDataGrid from '../Utils/InfiniteDataGrid'
+import InfiniteScrollSentinel from '../Utils/InfiniteScrollSentinel'
+import ListPagination from '../Utils/ListPagination'
+import useInfiniteRecords from '../Utils/useInfiniteRecords'
+import { PAGE_SIZE } from '../Utils/pagination'
 
 const ProductReviews = () => {
     const [productId, setProductId] = useState('')
-    const [activeProductId, setActiveProductId] = useState('')
-    const [listReviews, setListReviews] = useState([])
-    const [loading, setLoading] = useState(true)
+    const [searchedProductId, setSearchedProductId] = useState('')
 
-    // Loads every review by default, or only one product's reviews when a product ID is given.
-    const loadReviews = useCallback(async (id = '') => {
-        setLoading(true)
-        try {
-            const { data } = id
-                ? await adminApi.get('/reviews', { params: { id } })
-                : await adminApi.get('/admin/reviews')
-            setListReviews(data.reviews || [])
-        } catch (error) {
-            setListReviews([])
-            errMsg(error.response?.data?.message || error.message || 'Unable to load reviews.')
-        } finally {
-            setLoading(false)
-        }
+    const fetchPage = useCallback(async page => {
+        const endpoint = searchedProductId ? '/reviews' : '/admin/reviews'
+        const params = { page, limit: PAGE_SIZE }
+        if (searchedProductId) params.id = searchedProductId
+        const { data } = await adminApi.get(endpoint, { params })
+        return data
+    }, [searchedProductId])
+    const onLoadError = useCallback(error => {
+        errMsg(error.response?.data?.message || error.message || 'Unable to load reviews.')
     }, [])
-
-    useEffect(() => {
-        loadReviews()
-    }, [loadReviews])
+    const {
+        records: listReviews,
+        loading,
+        loadingMore,
+        hasMore,
+        failed,
+        currentPage,
+        totalCount,
+        pageSize,
+        loadMore,
+        goToPage,
+        reload,
+        removeRecord
+    } = useInfiniteRecords(fetchPage, 'reviews', true, onLoadError)
 
     const deleteReview = async (id, reviewProductId) => {
         try {
             const { data } = await adminApi.delete('/reviews', { params: { id, productId: reviewProductId } })
             if (data.success) {
+                removeRecord(id, review => review._id)
                 successMsg('Review deleted successfully')
-                await loadReviews(activeProductId)
+                await reload()
             }
         } catch (error) {
             errMsg(error.response?.data?.message || error.message || 'Unable to delete review.')
@@ -62,14 +70,14 @@ const ProductReviews = () => {
     const submitHandler = (e) => {
         e.preventDefault();
         const id = productId.trim()
-        setActiveProductId(id)
-        loadReviews(id)
+        if (id === searchedProductId) reload()
+        else setSearchedProductId(id)
     }
 
     const showAllHandler = () => {
         setProductId('')
-        setActiveProductId('')
-        loadReviews()
+        if (searchedProductId) setSearchedProductId('')
+        else reload()
     }
 
     const columns = [
@@ -159,7 +167,7 @@ const ProductReviews = () => {
                         >
                             SEARCH REVIEWS
                         </button>
-                        {activeProductId && (
+                        {searchedProductId && (
                             <button type="button" className="btn btn-light btn-block py-2 mt-2" onClick={showAllHandler}>
                                 SHOW ALL REVIEWS
                             </button>
@@ -168,11 +176,12 @@ const ProductReviews = () => {
                 </div>
                 {loading ? <Loader /> : rows.length > 0 ? (
                     <div className="admin-data-grid">
-                        <DataGrid
+                        <InfiniteDataGrid
                             rows={rows}
                             columns={columns}
-                            initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
-                            pageSizeOptions={[5, 10, 25]}
+                            hasMore={hasMore}
+                            loadingMore={loadingMore}
+                            onLoadMore={loadMore}
                             disableRowSelectionOnClick
                             getRowId={(row) => row.id}
                             showToolbar
@@ -180,8 +189,27 @@ const ProductReviews = () => {
                     </div>
                 ) : (
                     <p className="admin-empty-state">
-                        {activeProductId ? 'No reviews found for this product.' : 'No reviews have been submitted yet.'}
+                        {searchedProductId ? 'No reviews found for this product.' : 'No reviews have been submitted yet.'}
                     </p>
+                )}
+                {!loading && totalCount > 0 && (
+                    <ListPagination
+                        currentPage={currentPage}
+                        totalCount={totalCount}
+                        pageSize={pageSize}
+                        disabled={loading}
+                        onChange={goToPage}
+                    />
+                )}
+                {!loading && totalCount > 0 && (
+                    <InfiniteScrollSentinel
+                        hasMore={hasMore}
+                        loading={false}
+                        loadingMore={loadingMore}
+                        failed={failed}
+                        observeWindowScroll={false}
+                        onLoadMore={loadMore}
+                    />
                 )}
             </main>
         </>

@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import Stack from '@mui/material/Stack'
-import Pagination from '@mui/material/Pagination'
 import MetaData from './Layout/MetaData'
 import Loader from './Layout/Loader'
 import Product from './Product/Product'
+import InfiniteScrollSentinel from './Utils/InfiniteScrollSentinel'
+import ListPagination from './Utils/ListPagination'
+import { PAGE_SIZE } from './Utils/pagination'
 import { useDispatch, useSelector } from 'react-redux'
 import { getProducts } from '../actions/productActions'
-import { productCategories } from '../constants/productCategories'
+import { artSupplyCategories } from '../constants/productCategories'
 
 const initialFilters = {
     minPrice: '',
@@ -22,25 +23,50 @@ const Home = () => {
     const [currentPage, setCurrentPage] = useState(1)
     const { keyword = '' } = useParams()
     const dispatch = useDispatch()
-    const { loading, products, error, productsCount, resPerPage, filteredProductsCount } = useSelector(state => state.products)
+    const {
+        loading,
+        products,
+        error,
+        productsCount,
+        resPerPage,
+        filteredProductsCount
+    } = useSelector(state => state.products)
 
     const count = keyword || Object.values(filters).some(Boolean)
         ? filteredProductsCount
         : productsCount
 
     const stableFilters = useMemo(() => filters, [filters])
+    const loadingMoreRef = useRef(false)
+    const retryRequestRef = useRef({ page: 1, append: false })
+    const pageSize = resPerPage || PAGE_SIZE
+    const requestPage = useCallback(async (page, append = false) => {
+        retryRequestRef.current = { page, append }
+        const loaded = await dispatch(getProducts(page, keyword, stableFilters, append))
+        if (loaded) setCurrentPage(page)
+        return loaded
+    }, [dispatch, keyword, stableFilters])
 
     useEffect(() => {
-        dispatch(getProducts(currentPage, keyword, stableFilters))
-    }, [currentPage, dispatch, keyword, stableFilters])
+        Promise.resolve().then(() => requestPage(1, false))
+    }, [requestPage])
 
+    const loadMore = useCallback(async () => {
+        if (loading || loadingMoreRef.current || currentPage * pageSize >= count) return
+        loadingMoreRef.current = true
+        await requestPage(currentPage + 1, true)
+        loadingMoreRef.current = false
+    }, [count, currentPage, loading, pageSize, requestPage])
+    const goToPage = useCallback(page => requestPage(page, false), [requestPage])
+    const retryLoading = useCallback(
+        () => requestPage(retryRequestRef.current.page, retryRequestRef.current.append),
+        [requestPage]
+    )
     const updateFilter = (field, value) => {
-        setCurrentPage(1)
         setFilters(current => ({ ...current, [field]: value }))
     }
 
     const clearFilters = () => {
-        setCurrentPage(1)
         setFilters(initialFilters)
     }
 
@@ -48,7 +74,18 @@ const Home = () => {
         <>
             <MetaData title="Explore Supplies" />
             <main className="container container-fluid storefront-page">
-                {error && <div className="alert alert-danger" role="alert">{error}</div>}
+                {error && (
+                    <div className="alert alert-danger" role="alert">
+                        {error}
+                        <button
+                            type="button"
+                            className="btn btn-link"
+                            onClick={retryLoading}
+                        >
+                            Retry
+                        </button>
+                    </div>
+                )}
                 <section className="product-filter-panel storefront-filter-panel" aria-label="Product filters">
                     <div className="product-filter-heading">
                         <div>
@@ -88,7 +125,7 @@ const Home = () => {
                             <legend>Category</legend>
                             <select value={filters.category} onChange={event => updateFilter('category', event.target.value)}>
                                 <option value="">All categories</option>
-                                {productCategories.map(category => <option key={category} value={category}>{category}</option>)}
+                                {artSupplyCategories.map(category => <option key={category} value={category}>{category}</option>)}
                             </select>
                         </fieldset>
                         <fieldset className="product-filter-group">
@@ -117,28 +154,25 @@ const Home = () => {
                     </div>
                 </div>
                 <section className="storefront-results" aria-label="Product catalogue">
-                        {loading ? <Loader /> : products.length ? (
+                        {loading && !products.length ? <Loader /> : products.length ? (
                             <>
                                 <div className="product-grid">
                                     {products.map(product => <Product key={product._id} product={product} />)}
                                 </div>
-                                {resPerPage < count && (
-                                    <div className="d-flex justify-content-center mt-5">
-                                        <Stack spacing={2}>
-                                            <Pagination
-                                                count={Math.ceil(count / resPerPage)}
-                                                page={currentPage}
-                                                onChange={(event, page) => setCurrentPage(page)}
-                                                color="primary"
-                                                variant="outlined"
-                                                shape="rounded"
-                                                showFirstButton
-                                                showLastButton
-                                                size="large"
-                                            />
-                                        </Stack>
-                                    </div>
-                                )}
+                                <InfiniteScrollSentinel
+                                    hasMore={currentPage * pageSize < count}
+                                    loading={loading && products.length === 0}
+                                    loadingMore={loading && products.length > 0}
+                                    failed={Boolean(error)}
+                                    onLoadMore={loadMore}
+                                />
+                                <ListPagination
+                                    currentPage={currentPage}
+                                    totalCount={count || 0}
+                                    pageSize={pageSize}
+                                    disabled={loading}
+                                    onChange={goToPage}
+                                />
                             </>
                         ) : (
                             <div className="product-no-results">

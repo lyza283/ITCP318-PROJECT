@@ -15,7 +15,7 @@ export const Header = () => {
 
     const logoutHandler = () => {
         dispatch(logout());
-        toast.success('log out', {
+        toast.success('Sign Out', {
             position: 'bottom-right'
         });
     }

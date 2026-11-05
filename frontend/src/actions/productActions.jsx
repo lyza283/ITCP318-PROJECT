@@ -9,14 +9,20 @@ import {
 
     CLEAR_ERRORS
 } from '../constants/productConstants';
+import { PAGE_SIZE } from '../Components/Utils/pagination'
 
-export const getProducts = (currentPage = 1, keyword = '', filters = {}) => async (dispatch) => {
+export const getProducts = (currentPage = 1, keyword = '', filters = {}, append = currentPage > 1) => async (dispatch) => {
     try {
         dispatch({
-            type: ALL_PRODUCTS_REQUEST
+            type: ALL_PRODUCTS_REQUEST,
+            payload: { append }
         })
 
-        const params = new URLSearchParams({ page: String(currentPage), keyword })
+        const params = new URLSearchParams({
+            page: String(currentPage),
+            limit: String(PAGE_SIZE),
+            keyword
+        })
         if (filters.minPrice !== '') params.set('price[gte]', String(filters.minPrice))
         if (filters.maxPrice !== '') params.set('price[lte]', String(filters.maxPrice))
         if (filters.category) params.set('category', filters.category)
@@ -26,14 +32,19 @@ export const getProducts = (currentPage = 1, keyword = '', filters = {}) => asyn
         const { data } = await axios.get(`${import.meta.env.VITE_API}/products?${params.toString()}`)
         dispatch({
             type: ALL_PRODUCTS_SUCCESS,
-            payload: data
+            payload: { ...data, append }
         })
+        return true
 
     } catch (error) {
         dispatch({
             type: ALL_PRODUCTS_FAIL,
-            payload: error.response?.data?.message || error.message || 'Unable to load products.'
+            payload: {
+                message: error.response?.data?.message || error.message || 'Unable to load products.',
+                append
+            }
         })
+        return false
     }
 }
 

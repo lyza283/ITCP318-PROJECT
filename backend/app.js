@@ -29,6 +29,10 @@ app.use('/api/v1', order);
 app.use((error, req, res, next) => {
     if (res.headersSent) return next(error);
 
+    if (error.statusCode === 400) {
+        return res.status(400).json({ success: false, message: error.message });
+    }
+
     if (error instanceof multer.MulterError || error.message?.startsWith('Only JPG, PNG')) {
         return res.status(400).json({ success: false, message: error.message });
     }

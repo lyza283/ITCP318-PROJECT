@@ -2,6 +2,7 @@ const Product = require('../models/product')
 const Order = require('../models/order')
 const cloudinary = require('cloudinary')
 const APIFeatures = require('../utils/apiFeatures');
+const { getPagination, paginationMetadata } = require('../utils/pagination');
 const fs = require('fs/promises');
 const mongoose = require('mongoose');
 const { Filter } = require('bad-words');
@@ -110,7 +111,7 @@ exports.getSingleProduct = async (req, res, next) => {
 
 exports.getProducts = async (req, res) => {
     try {
-        const resPerPage = 4;
+        const resPerPage = 5;
         const apiFeatures = new APIFeatures(Product.find(), req.query).search().filter()
         apiFeatures.pagination(resPerPage);
 
@@ -124,6 +125,8 @@ exports.getProducts = async (req, res) => {
             success: true,
             products,
             filteredProductsCount,
+            totalCount: filteredProductsCount,
+            hasMore: (Number(req.query.page) || 1) * resPerPage < filteredProductsCount,
             resPerPage,
             productsCount,
         });
@@ -327,19 +330,18 @@ exports.deleteProducts = async (req, res) => {
 }
 
 exports.getAdminProducts = async (req, res, next) => {
-
-    const products = await Product.find();
-    if (!products) {
-        return res.status(404).json({
-            success: false,
-            message: 'Products not found'
-        })
-    }
+    const { page, limit, skip } = getPagination(req.query);
+    const [products, totalCount, outOfStockCount] = await Promise.all([
+        Product.find().sort({ _id: 1 }).skip(skip).limit(limit),
+        Product.countDocuments(),
+        Product.countDocuments({ stock: 0 })
+    ]);
     return res.status(200).json({
         success: true,
-        products
+        products,
+        outOfStockCount,
+        ...paginationMetadata(totalCount, page, limit)
     })
-
 }
 
 exports.createProductReview = async (req, res, next) => {
@@ -410,12 +412,14 @@ const formatReview = (product, review) => ({
 });
 
 exports.getAllReviews = async (req, res, next) => {
+    const { page, limit, skip } = getPagination(req.query);
     const products = await Product.find({ 'reviews.0': { $exists: true } }).select('name reviews');
-    const reviews = products.flatMap(product => product.reviews.map(review => formatReview(product, review)));
+    const allReviews = products.flatMap(product => product.reviews.map(review => formatReview(product, review)));
     return res.status(200).json({
         success: true,
-        count: reviews.length,
-        reviews
+        count: allReviews.length,
+        reviews: allReviews.slice(skip, skip + limit),
+        ...paginationMetadata(allReviews.length, page, limit)
     });
 }
 
@@ -427,9 +431,11 @@ exports.getProductReviews = async (req, res, next) => {
     if (!product) {
         return res.status(404).json({ success: false, message: 'Product not found.' });
     }
+    const { page, limit, skip } = getPagination(req.query);
     return res.status(200).json({
         success: true,
-        reviews: product.reviews.map(review => formatReview(product, review))
+        reviews: product.reviews.slice(skip, skip + limit).map(review => formatReview(product, review)),
+        ...paginationMetadata(product.reviews.length, page, limit)
     });
 }
 

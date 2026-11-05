@@ -2061,13 +2061,26 @@ body .MuiDataGrid-root {
 
 .admin-data-grid {
   width: 100%;
-  height: min(65vh, 680px);
-  min-height: 440px;
+  height: min(65vh, 300px);
+  min-height: 280px;
   overflow: hidden;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: #fff;
   box-shadow: 0 8px 24px rgb(15 23 42 / 4%);
+}
+
+.infinite-data-grid-wrapper {
+  height: 100%;
+  min-height: 0;
+}
+
+.infinite-scroll-status {
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
 }
 
 .dashboard-stats {
@@ -2783,6 +2796,65 @@ body .MuiSlider-thumb {
 body .MuiSlider-track {
   background-color: var(--brand-yellow-hover);
   border-color: var(--brand-yellow-hover);
+}
+
+.wrapper form .auth-input {
+  min-height: 52px;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--brand-brown-border);
+  border-radius: 10px;
+  font-weight: 400;
+}
+
+.wrapper form .auth-input:focus {
+  border-color: var(--brand-yellow-hover);
+  box-shadow: 0 0 0 0.2rem rgb(242 201 76 / 25%);
+}
+
+.wrapper form .auth-primary-button {
+  min-height: 52px;
+  margin-top: 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--brand-yellow);
+  border-radius: 10px;
+  background-color: var(--brand-yellow);
+  color: var(--brand-slate-dark);
+  font-weight: 700;
+}
+
+.wrapper form .auth-primary-button:hover,
+.wrapper form .auth-primary-button:focus {
+  border-color: var(--brand-yellow-hover);
+  background-color: var(--brand-yellow-hover);
+  color: var(--brand-slate-dark);
+}
+
+.wrapper form .google-auth-button {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 0;
+  padding: 0.65rem 1rem;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  background-color: #fff;
+  color: #3c4043;
+  font-weight: 600;
+}
+
+.wrapper form .google-auth-button:hover,
+.wrapper form .google-auth-button:focus {
+  border-color: #c6c6c6;
+  background-color: #f8faff;
+  color: #202124;
+}
+
+.google-auth-logo {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
 }
 
 .product-editor-wrapper {

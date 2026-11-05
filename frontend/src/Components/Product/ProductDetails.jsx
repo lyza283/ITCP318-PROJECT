@@ -138,7 +138,7 @@ const ProductDetails = () => {
 
                 {product.reviews?.length > 0 && (
                     <section className="product-reviews-section">
-                        <ListReviews reviews={product.reviews} />
+                        <ListReviews key={product._id} reviews={product.reviews} />
                     </section>
                 )}
             </main>

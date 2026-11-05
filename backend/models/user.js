@@ -18,9 +18,14 @@ const userSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        required: function () { return !this.googleId },
+        required: function () { return !this.googleId && !this.firebaseUid },
         minlength: [6, 'Your password must be longer than 6 characters'],
         select: false
+    },
+    firebaseUid: {
+        type: String,
+        unique: true,
+        sparse: true
     },
     googleId: {
         type: String,
